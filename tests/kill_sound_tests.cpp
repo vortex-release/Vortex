@@ -1,6 +1,8 @@
 #include "kill_sound.hpp"
 #include <mfapi.h>
 #include <xaudio2.h>
+#include <mmsystem.h>
+#include <string_view>
 #include <wrl/client.h>
 #include <filesystem>
 #include <fstream>
@@ -26,6 +28,11 @@ static void Wave(const std::filesystem::path &path, const Clip &clip) {
     out.write(reinterpret_cast<const char *>(clip.pcm.data()), clip.pcm.size());
 }
 int main(int argc, char **argv) {
+    const bool deviceTest = argc == 2 && std::string_view(argv[1]) == "--device";
+    if (deviceTest && waveOutGetNumDevs() == 0) {
+        std::puts("SKIP: no Windows audio output device; decoder/error handling is covered separately.");
+        return 77;
+    }
     const auto com = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     if (FAILED(com))
         return 2;
@@ -65,36 +72,38 @@ int main(int argc, char **argv) {
           "long clips are rejected without retaining partial audio");
     std::atomic_bool stop{true};
     check(Decode(path.wstring(), decoded, &stop) == E_ABORT, "shutdown cancels decoding");
-    Microsoft::WRL::ComPtr<IXAudio2> engine;
-    IXAudio2MasteringVoice *master{};
-    IXAudio2SourceVoice *voice{};
-    HRESULT hr = XAudio2Create(&engine);
-    if (SUCCEEDED(hr))
-        hr = engine->CreateMasteringVoice(&master);
-    if (SUCCEEDED(hr))
-        hr = engine->CreateSourceVoice(&voice, &clip.format);
-    check(SUCCEEDED(hr), "XAudio2 creates the sound output graph");
-    if (voice) {
-        voice->SetVolume(0); // Unattended tests must not produce audible sound.
-        // Leave EOS clear so SamplesPlayed is not reset at the end of the buffer.
-        XAUDIO2_BUFFER buffer{};
-        buffer.AudioBytes = static_cast<UINT32>(clip.pcm.size());
-        buffer.pAudioData = clip.pcm.data();
-        check(SUCCEEDED(voice->SubmitSourceBuffer(&buffer)) && SUCCEEDED(voice->Start()),
-              "sound buffer submitted and started");
-        XAUDIO2_VOICE_STATE state{};
-        const auto deadline = GetTickCount64() + 3000;
-        do {
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-            voice->GetState(&state);
-        } while (state.BuffersQueued && GetTickCount64() < deadline);
-        check(!state.BuffersQueued && state.SamplesPlayed == clip.pcm.size() / clip.format.nBlockAlign,
-              "audio device consumed every sample");
-        voice->DestroyVoice();
+    if (deviceTest) {
+        Microsoft::WRL::ComPtr<IXAudio2> engine;
+        IXAudio2MasteringVoice *master{};
+        IXAudio2SourceVoice *voice{};
+        HRESULT hr = XAudio2Create(&engine);
+        if (SUCCEEDED(hr))
+            hr = engine->CreateMasteringVoice(&master);
+        if (SUCCEEDED(hr))
+            hr = engine->CreateSourceVoice(&voice, &clip.format);
+        check(SUCCEEDED(hr), "XAudio2 creates the sound output graph");
+        if (voice) {
+            voice->SetVolume(0); // Unattended tests must not produce audible sound.
+            // Leave EOS clear so SamplesPlayed is not reset at the end of the buffer.
+            XAUDIO2_BUFFER buffer{};
+            buffer.AudioBytes = static_cast<UINT32>(clip.pcm.size());
+            buffer.pAudioData = clip.pcm.data();
+            check(SUCCEEDED(voice->SubmitSourceBuffer(&buffer)) && SUCCEEDED(voice->Start()),
+                  "sound buffer submitted and started");
+            XAUDIO2_VOICE_STATE state{};
+            const auto deadline = GetTickCount64() + 3000;
+            do {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                voice->GetState(&state);
+            } while (state.BuffersQueued && GetTickCount64() < deadline);
+            check(!state.BuffersQueued && state.SamplesPlayed == clip.pcm.size() / clip.format.nBlockAlign,
+                  "audio device consumed every sample");
+            voice->DestroyVoice();
+        }
+        if (master)
+            master->DestroyVoice();
+        engine.Reset();
     }
-    if (master)
-        master->DestroyVoice();
-    engine.Reset();
     {
         Player player;
         const auto missing = (directory / L"missing.wav").u8string();
@@ -108,7 +117,7 @@ int main(int argc, char **argv) {
         player.Preview();
         check(player.Status().empty(), "changing back to built-in clears old errors");
     }
-    {
+    if (deviceTest) {
         Clip silent = Builtin();
         std::fill(silent.pcm.begin(), silent.pcm.end(), std::uint8_t{0});
         const auto silence = directory / L"silent.wav";
@@ -122,7 +131,7 @@ int main(int argc, char **argv) {
         hit.Configure(false, "", 0);
         std::filesystem::remove(silence);
     }
-    if (argc == 2) {
+    if (argc == 2 && !deviceTest) {
         const auto extra = std::filesystem::absolute(argv[1]);
         check(SUCCEEDED(Decode(extra.wstring(), decoded)) && !decoded.pcm.empty(),
               "additional compressed audio fixture decodes");

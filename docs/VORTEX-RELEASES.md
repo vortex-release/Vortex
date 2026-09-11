@@ -7,7 +7,7 @@ The permanent public repository is https://github.com/vortex-release/Vortex. Vor
 From the project directory in PowerShell:
 
 ```powershell
-./release.ps1 3.23.2
+./release.ps1 3.23.3
 ```
 
 Review your changes and update release/notes.md first. The helper checks the main branch and origin, validates the version, rejects existing local/remote tags and GitHub releases, and audits eligible files for credentials and build garbage. It updates the central version, builds x64 Release, runs tests, builds/verifies the installer, commits, creates an annotated tag, and atomically pushes main plus the tag. A failed local build cannot publish. Existing tags/releases are never overwritten. If a push fails, inspect the local commit/tag before retrying; the script will deliberately refuse to replace an existing tag.
@@ -15,10 +15,10 @@ Review your changes and update release/notes.md first. The helper checks the mai
 For an unpublished version, validation without committing/tagging/pushing is available:
 
 ```powershell
-./release.ps1 3.23.1 -ValidateOnly
+./release.ps1 3.23.2 -ValidateOnly
 ```
 
-Validation restores the original version file afterwards and prints the artifacts directory. Choose a newer unpublished version once 3.23.1 is released. GitHub CLI is needed only on the developer machine. Its one-time web authorization stores credentials in the OS credential store. Vortex users never need to authenticate with GitHub.
+Validation restores the original version file afterwards and prints the artifacts directory. Choose a newer unpublished version once 3.23.2 is released. GitHub CLI is needed only on the developer machine. Its one-time web authorization stores credentials in the OS credential store. Vortex users never need to authenticate with GitHub.
 
 ## Central version and builds
 
@@ -63,3 +63,5 @@ Preferences, named profiles and logs stay under %LOCALAPPDATA%\Vortex, separate 
 This first public release is unsigned. SHA-256 verifies integrity but does not replace a publisher signing certificate. Existing -SignParams and -AzureTrustedSignFile packaging options remain available; signing credentials must stay outside the repository.
 
 Update logs: %LOCALAPPDATA%\Vortex\logs\Vortex.log, rotated at 2 MiB. The old loopback update server remains available for development and is unnecessary for GitHub releases.
+
+The audio-device check is reported as skipped when Windows exposes no playback device (as on hosted CI). Audio decoding, cancellation and error reporting still run everywhere. Local hardware playback remains tested.
