@@ -1,0 +1,65 @@
+name: Release Vortex
+on:
+  push:
+    tags:
+      - 'v*'
+permissions:
+  contents: read
+concurrency:
+  group: vortex-release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: windows-2022
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Validate tag and repository
+        run: |
+          $ErrorActionPreference = 'Stop'
+          . ./scripts/release-support.ps1
+          $config = Get-Content ./release/config.json -Raw | ConvertFrom-Json
+          Assert-ReleaseVersion $config.version
+          if ($env:GITHUB_REPOSITORY -cne 'vortex-release/Vortex' -or $env:GITHUB_REF_NAME -cne "v$($config.version)") { throw 'Tag, repository and central version must agree.' }
+          Assert-ReleaseFiles
+      - name: Prepare pinned installer tooling
+        run: ./scripts/setup-release-tools.ps1
+      - name: Build, test and package Windows x64 Release
+        run: |
+          ./scripts/package-vortex.ps1 -BuildDirectory "$env:RUNNER_TEMP/VortexBuild" -ReleaseDirectory "$env:RUNNER_TEMP/VortexRelease" -NoDesktopCopy
+          . ./scripts/release-support.ps1
+          $config = Get-Content ./release/config.json -Raw | ConvertFrom-Json
+          Assert-ReleaseArtifacts "$env:RUNNER_TEMP/VortexRelease" $config.version $config.id
+      - name: Create draft, upload verified assets, then publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $config = Get-Content ./release/config.json -Raw | ConvertFrom-Json
+          $tag = $env:GITHUB_REF_NAME
+          $existing = gh api --paginate "repos/$env:GITHUB_REPOSITORY/releases" --jq '.[].tag_name'
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot verify existing releases.' }
+          if (@($existing) -contains $tag) { throw 'Release already exists; refusing to overwrite it.' }
+          $dir = "$env:RUNNER_TEMP/VortexRelease"
+          $assets = @("$dir/VortexSetup.exe", "$dir/SHA256SUMS.txt", "$dir/releases.win.json", "$dir/$($config.id)-$($config.version)-full.nupkg")
+          gh release create $tag @assets --repo $env:GITHUB_REPOSITORY --verify-tag --draft --title "Vortex $($config.version)" --notes-file ./release/notes.md
+          if ($LASTEXITCODE -ne 0) { throw 'Release asset upload failed; no public release was published.' }
+          $uploaded = gh release view $tag --repo $env:GITHUB_REPOSITORY --json assets | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or @($uploaded.assets).Count -ne 4) { throw 'Uploaded release is incomplete; leaving it as a draft.' }
+          foreach ($file in $assets) {
+            $local = Get-Item -LiteralPath $file
+            $remote = @($uploaded.assets | Where-Object name -eq $local.Name)
+            if ($remote.Count -ne 1 -or $remote[0].size -ne $local.Length) { throw 'Uploaded asset size mismatch; leaving draft unpublished.' }
+          }
+          gh release edit $tag --repo $env:GITHUB_REPOSITORY --draft=false --latest
+          if ($LASTEXITCODE -ne 0) { throw 'Could not publish the verified draft.' }

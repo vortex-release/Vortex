@@ -1,0 +1,206 @@
+[
+  {
+    "id": 1,
+    "name": "deagle",
+    "asset": "panorama/images/icons/equipment/deagle.vsvg_c",
+    "sha256": "94C0D691D24BDC9A416C81E4FB80D80AAE19784FF750D714797EABF1EC8F5BC6"
+  },
+  {
+    "id": 2,
+    "name": "elite",
+    "asset": "panorama/images/icons/equipment/elite.vsvg_c",
+    "sha256": "E062C69B25F6286C9FB9668BC531233CCB180CD1F00E8B7331305DF54538AD66"
+  },
+  {
+    "id": 3,
+    "name": "fiveseven",
+    "asset": "panorama/images/icons/equipment/fiveseven.vsvg_c",
+    "sha256": "39D334C1DA7947980920B2819A5A3F092F084128A810DB5227793D917FA5D9D5"
+  },
+  {
+    "id": 4,
+    "name": "glock",
+    "asset": "panorama/images/icons/equipment/glock.vsvg_c",
+    "sha256": "56932DFFA12F3A321749C4F5855E56045D882052FAC50F614EB038127C23D9AD"
+  },
+  {
+    "id": 7,
+    "name": "ak47",
+    "asset": "panorama/images/icons/equipment/ak47.vsvg_c",
+    "sha256": "E6E7B5DAE30AB44EEA8B14CE3BBACC1B2616DA369AB611CDD5FCC176A0DD17F9"
+  },
+  {
+    "id": 8,
+    "name": "aug",
+    "asset": "panorama/images/icons/equipment/aug.vsvg_c",
+    "sha256": "C9257FCD32AAA43B3C804370BBE05E1666D5E1EF14F9B7B7FDA49CB91775B1F5"
+  },
+  {
+    "id": 9,
+    "name": "awp",
+    "asset": "panorama/images/icons/equipment/awp.vsvg_c",
+    "sha256": "869800AC1A07C5F76833F880476E5B08E1CAF71A6E8DB30E7EA275D49166F66E"
+  },
+  {
+    "id": 10,
+    "name": "famas",
+    "asset": "panorama/images/icons/equipment/famas.vsvg_c",
+    "sha256": "C5482C68991DDCA1271346B4E2984F29C46654A6B96D5C1ECBFC2962F1CB03E5"
+  },
+  {
+    "id": 11,
+    "name": "g3sg1",
+    "asset": "panorama/images/icons/equipment/g3sg1.vsvg_c",
+    "sha256": "D5B8D5C4F6882EE626E7F41A418224D498017F0D42A782E9E151787D178546FE"
+  },
+  {
+    "id": 13,
+    "name": "galilar",
+    "asset": "panorama/images/icons/equipment/galilar.vsvg_c",
+    "sha256": "C1531EF4ABA2DB6D62EF564D9084FC75C4A744259C2951781D8AA4E6086C7ACB"
+  },
+  {
+    "id": 14,
+    "name": "m249",
+    "asset": "panorama/images/icons/equipment/m249.vsvg_c",
+    "sha256": "5F9B6271E42C62295BAB6A736593DE1548CA3CE06E97AF8F2B253A056D5F2A0C"
+  },
+  {
+    "id": 16,
+    "name": "m4a1",
+    "asset": "panorama/images/icons/equipment/m4a1.vsvg_c",
+    "sha256": "AAEE38302DC0EA14470EAE7C6BC2F7095F492453945E9635B9B166904C3F1CE4"
+  },
+  {
+    "id": 17,
+    "name": "mac10",
+    "asset": "panorama/images/icons/equipment/mac10.vsvg_c",
+    "sha256": "3B9B734F1AFF8AF60E6EF4AD0B9882E2AA2EB970FAD1D74F65602DB53C5942D2"
+  },
+  {
+    "id": 19,
+    "name": "p90",
+    "asset": "panorama/images/icons/equipment/p90.vsvg_c",
+    "sha256": "EA5DED1D759A97FC9C96436731015241CACA55A60B510F2185611F3A670BAA14"
+  },
+  {
+    "id": 23,
+    "name": "mp5sd",
+    "asset": "panorama/images/icons/equipment/mp5sd.vsvg_c",
+    "sha256": "A3E173845523EB4E0D96EC563E8A9BEEF0FB41E06E2A2482F5DC02FC12769836"
+  },
+  {
+    "id": 24,
+    "name": "ump45",
+    "asset": "panorama/images/icons/equipment/ump45.vsvg_c",
+    "sha256": "BC4EE9CF252F3A21FFF673440FE9334D83A2E7AC0D9F3938CEFCE709A15024DD"
+  },
+  {
+    "id": 25,
+    "name": "xm1014",
+    "asset": "panorama/images/icons/equipment/xm1014.vsvg_c",
+    "sha256": "A1DF61AAF38FC97A72366CF0060435608527F6B45D8DF3FC381D1316798368BB"
+  },
+  {
+    "id": 26,
+    "name": "bizon",
+    "asset": "panorama/images/icons/equipment/bizon.vsvg_c",
+    "sha256": "83CE343FB1BCBEE0BEB238B49ABF76A747B31EE37C26D329783A205AB369DED9"
+  },
+  {
+    "id": 27,
+    "name": "mag7",
+    "asset": "panorama/images/icons/equipment/mag7.vsvg_c",
+    "sha256": "2718CFE02846B1ABB4CE31E7EC517845182D6A17C83D1BDF2B06BA84FF5FA482"
+  },
+  {
+    "id": 28,
+    "name": "negev",
+    "asset": "panorama/images/icons/equipment/negev.vsvg_c",
+    "sha256": "933F0354A1AE3F0E9DCA4E0A8AAE769219920F694E0223B567D09F006F2C30E4"
+  },
+  {
+    "id": 29,
+    "name": "sawedoff",
+    "asset": "panorama/images/icons/equipment/sawedoff.vsvg_c",
+    "sha256": "ECF8847C7FDD99CCD0C7874AC5FB0ACD02184DD2DB8EB0FEBC952CC0B2BCBD53"
+  },
+  {
+    "id": 30,
+    "name": "tec9",
+    "asset": "panorama/images/icons/equipment/tec9.vsvg_c",
+    "sha256": "31C5248B13355296591F3056C8E29DB4CFCD05E4AB79FFB1A8E101B959D5C024"
+  },
+  {
+    "id": 32,
+    "name": "hkp2000",
+    "asset": "panorama/images/icons/equipment/hkp2000.vsvg_c",
+    "sha256": "DEFD5F95682412E1FF3610F9869ACEB6AEB66017FB233C4B61EDD660EADB2384"
+  },
+  {
+    "id": 33,
+    "name": "mp7",
+    "asset": "panorama/images/icons/equipment/mp7.vsvg_c",
+    "sha256": "168A9D00EEE0C6A0BE60FF7B4F532A6B762743825E88CB333FDAADB24E0EF1EF"
+  },
+  {
+    "id": 34,
+    "name": "mp9",
+    "asset": "panorama/images/icons/equipment/mp9.vsvg_c",
+    "sha256": "A61120D696A23093594A566E88473E381ECAB9B52B6A5980B1DC623D689B362D"
+  },
+  {
+    "id": 35,
+    "name": "nova",
+    "asset": "panorama/images/icons/equipment/nova.vsvg_c",
+    "sha256": "C6A8E1813746B15C73B887C0454176558E917884651C7F26E5420EB35CA4F55B"
+  },
+  {
+    "id": 36,
+    "name": "p250",
+    "asset": "panorama/images/icons/equipment/p250.vsvg_c",
+    "sha256": "15805E045BD96C2AAAEFF2E56BEF69440FE426E3FD3B6B68C903DF1C3089143E"
+  },
+  {
+    "id": 38,
+    "name": "scar20",
+    "asset": "panorama/images/icons/equipment/scar20.vsvg_c",
+    "sha256": "AA2869BDB73CB326934F1F8E0563848EDB5A6047581BB8F6003E94A460999AB4"
+  },
+  {
+    "id": 39,
+    "name": "sg556",
+    "asset": "panorama/images/icons/equipment/sg556.vsvg_c",
+    "sha256": "F1D757783CA92F06D5164DF4C5A34D00D7F4F518E52D3B90A86DAC04B2E131B1"
+  },
+  {
+    "id": 40,
+    "name": "ssg08",
+    "asset": "panorama/images/icons/equipment/ssg08.vsvg_c",
+    "sha256": "2AB7E01C5B289A20BFDCD38BAAB3181E53DC39B178AE743524C449F520E07A4D"
+  },
+  {
+    "id": 60,
+    "name": "m4a1_silencer",
+    "asset": "panorama/images/icons/equipment/m4a1_silencer.vsvg_c",
+    "sha256": "F9355FA0CD4FB8A45B49D30EA58E592728D2B4B065A06513951BE29D4DF6F181"
+  },
+  {
+    "id": 61,
+    "name": "usp_silencer",
+    "asset": "panorama/images/icons/equipment/usp_silencer.vsvg_c",
+    "sha256": "F31B7D4826303B596691441B056AECACA5EEF59DFFE049A4506A96F0232319CB"
+  },
+  {
+    "id": 63,
+    "name": "cz75a",
+    "asset": "panorama/images/icons/equipment/cz75a.vsvg_c",
+    "sha256": "FEAE2477362A0745068422184F9005A09854181C5ACD0B9CDDAC235946156A97"
+  },
+  {
+    "id": 64,
+    "name": "revolver",
+    "asset": "panorama/images/icons/equipment/revolver.vsvg_c",
+    "sha256": "EEC6C25DD9AC2FF82BE8E741DC22DB83DD76F015E63EE7955A7CFC16031547E8"
+  }
+]

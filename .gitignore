@@ -1,0 +1,45 @@
+# Generated builds and local state
+[Bb]uild*/
+[Dd]ist/
+out/
+.vs/
+.idea/
+.vscode/
+CMakeUserPresets.json
+CMakeCache.txt
+CMakeFiles/
+Testing/
+_deps/
+OverlaySettings.ini*
+Launcher.ini
+imgui.ini
+*.log
+*.bmp
+*.pdb
+*.obj
+*.ilk
+*.tlog
+*.user
+*.suo
+*.bak
+*.tmp
+*.partial
+*.publishing
+*.zip
+*.nupkg
+.env
+.env.*
+*.pem
+*.key
+*.pfx
+*.p12
+release/signing-metadata.json
+# Vendored SDK DLL/import library and required media are intentional source dependencies.
+
+# Unused SDK architectures/static libraries are not release dependencies.
+dependencies/velopack/lib-static/
+dependencies/velopack/lib/*
+!dependencies/velopack/lib/velopack_libc_win_x64_msvc.dll
+!dependencies/velopack/lib/velopack_libc_win_x64_msvc.dll.lib
+profile/background.png
+release/offline-verification-*.md

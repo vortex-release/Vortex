@@ -1,0 +1,16 @@
+* text=auto
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+*.cpp text eol=lf
+*.hpp text eol=lf
+*.yml text eol=lf
+*.png binary
+*.ico binary
+*.bin binary
+*.dll binary
+*.lib binary
+
+# Preserve source snapshots and assets that carry byte-level checksums.
+"Updated Offsets/**" -text
+assets/** -text
+dependencies/velopack/** -text

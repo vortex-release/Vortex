@@ -1,0 +1,22 @@
+{
+  "build": 14181,
+  "verified_date": "2026-09-11",
+  "scenesystem_sha256": "9CCCF52CFD8EB3071838AADA2B453276D0A85374C95E4735B1D2B0EB9D05105C",
+  "materialsystem_sha256": "DFAE3774E75036A3A81139772252FC1750F040B031F39EF6C7931C6EA2364782",
+  "SceneTimestamp": 1788980763,
+  "SceneImageSize": 9867264,
+  "MaterialTimestamp": 1788980772,
+  "MaterialImageSize": 1564672,
+  "RenderCallback": 345552,
+  "RenderVtableSlot": 6133632,
+  "CreateMaterial": 241616,
+  "PacketStride": 112,
+  "PacketSceneObject": 24,
+  "PacketMaterial": 32,
+  "PacketColor": 80,
+  "SceneUpdaterCount": 56,
+  "SceneUpdaterArray": 64,
+  "UpdaterSceneObject": 32,
+  "ViewPass": 48,
+  "note": "RVAs, packet stride and material field verified against local PE code; packet layout and model names captured live. Owner field from older references is deliberately unused. CsgoForward is the case-insensitive Murmur2 token of the matching client.dll string."
+}

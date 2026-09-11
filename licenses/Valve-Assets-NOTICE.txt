@@ -1,0 +1,9 @@
+The weapon silhouettes are Valve CS2 UI assets extracted from the installed
+game for this local build. Original asset ownership remains with Valve.
+The project's MIT license does not relicense these game assets.
+assets/weapons/manifest.json records their source paths and SHA-256 hashes.
+
+The SAS preview model and base-color textures are also extracted from the
+installed CS2 game. Original ownership remains with Valve.
+assets/preview-model.json records their source, skeleton and exporter.
+Exported using Source 2 Viewer 20.0 (ValveResourceFormat): https://s2v.app

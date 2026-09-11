@@ -1,0 +1,18 @@
+{
+  "build": 14181,
+  "bone_array": 128,
+  "bone_count": 148,
+  "bone_stride": 32,
+  "client_sha256": "A0C195F0B6EC00915EF08C548200A010EBBE7982D3A4BC468CAD939B67C8C4E3",
+  "evidence_rva": "0x91882F: uint16 [skeleton+0x1D4], pointer [skeleton+0x1C0], byte count shifted by 5",
+  "sas_asset": "agents/models/ctm_sas/ctm_sas.vmdl_c",
+  "sas_sha256": "7312AB88D05BEA67B06F3A945D06DC1E5FC5511D4849BC05BC05AEC25380EB22",
+  "phoenix_asset": "agents/models/tm_phoenix/tm_phoenix.vmdl_c",
+  "phoenix_sha256": "3C29D019E52266DF983884ABF0AB5E6F351D7C5EE2F2F6B9E8BDA367E6E044C6",
+  "bones": {
+    "Head": 7,
+    "Neck": 6,
+    "Chest": 4,
+    "Pelvis": 1
+  }
+}

@@ -1,0 +1,7 @@
+101 RCDATA "@CMAKE_CURRENT_SOURCE_DIR@/assets/weapon-atlas.png"
+102 RCDATA "@CMAKE_CURRENT_SOURCE_DIR@/assets/preview-model.bin"
+111 RCDATA "@CMAKE_CURRENT_SOURCE_DIR@/assets/preview-0.png"
+112 RCDATA "@CMAKE_CURRENT_SOURCE_DIR@/assets/preview-1.png"
+113 RCDATA "@CMAKE_CURRENT_SOURCE_DIR@/assets/preview-2.png"
+114 RCDATA "@CMAKE_CURRENT_SOURCE_DIR@/assets/preview-3.png"
+115 RCDATA "@CMAKE_CURRENT_SOURCE_DIR@/assets/preview-4.png"

@@ -1,0 +1,37 @@
+# Awareness arrows and two-color fill (3.8)
+
+## Controls
+
+**Players > Awareness** controls the direction arrows around the screen center. They start enabled, with Offscreen only enabled. Turn Offscreen only off to include players already inside the camera view. Radius, Size and Color (including opacity) save in OverlaySettings.ini. Arrows follow the existing Players team/range/opacity filters and skip self, dead, dormant, invalid and stale records. Camera tracking's team selector remains independent.
+
+These arrows indicate a horizontal direction, not a line-of-sight result. A target directly above/below the camera has no horizontal bearing and is omitted. With Offscreen only enabled, any target whose bounds intersect the camera viewport is omitted, including targets behind walls inside that viewport. Turn it off to see their direction too. No labels or circle outline are added. Geometry scales with the viewport and updates on each Present; it has no separate timer or interpolation delay.
+
+**Players > General > Glow / chams > Fill > Two colors** enables model fill. Visible and Hidden have separate color/opacity controls. Single-color mode remains available. Native CS2 fill uses the model's own edge; adjustable soft edges are available only to hosts supplying meshes and scene depth.
+
+## Native CS2 integration
+
+`cs2_model_fill.cpp` intercepts the verified build-14181 animated-model draw callback. The pass is **CsgoForward**, not the generic Forward token. Packets are 112 bytes; material and RGBA fields are at 0x20 and 0x50. Their live scene objects are matched to selected pawns through the imported render component and its updater array. Complete entity handles, identity pointers, component ownership and health are revalidated before each selected draw. Only agent model packets are accepted; no preview mesh, collision box or spotted flag supplies the silhouette or visibility.
+
+Two flat materials render the hidden layer without depth testing and the visible layer with the engine's depth test. The original model draw sits between them, preserving normal visible surfaces under translucent fill. Only copied packets change; original material, color, sort key and animation inputs remain untouched. Behind-walls mode omits the visible override. Single-color mode retains native glow. The two native effects paths are mutually exclusive. Player selection expires after 250 ms without a fresh update and pauses when disabled, minimized or stale.
+
+Startup checks the engine build, scene/material module timestamps and sizes, callback bytes, material-creation bytes and the matching scene vtable slot before installing the hook. The separate `Updated Offsets/render-layout.json` records those values and local module hashes. The standalone KeyValues3 root sets its ownership flag; zero-initializing it would make the parser read a pooled context before the object. Material bindings are created once and retained with the engine resource cache rather than recreated on toggles. Shutdown disables the hook and waits for active callbacks before removing it. A host unloading the DLL must also quiesce game render workers, in addition to the existing Present/export caller contract.
+
+The existing `AwarenessSubmitEffectsInput` mesh/depth path still takes priority when a host supplies valid inputs. If the native layout cannot be verified or materials cannot be created, automatic mode retains native single-color glow and reports that fallback. Pending status means no eligible model draw has reached the hook yet; it is not reported as a successful two-color render.
+
+This path can fill only models the game submits. Engine culling, unusual render passes, transparent world surfaces, other agent rigs and later scene compositing may affect coverage. It does not reconstruct culled geometry. Native soft-edge postprocessing is not implemented, and the CS2 menu does not expose an ineffective width control.
+
+## Rendering and compatibility
+
+`EffectVisibility::TwoColor` is appended with value 2. Existing exported struct sizes, field offsets and API version remain unchanged. In this mode `materialColor` means Visible and the existing `glowColor` field means Hidden. In other modes their previous fill/edge behavior remains. Configuration normalization and INI loading preserve both colors in TwoColor mode; older single-color profiles retain their behavior.
+
+The host mesh renderer rasterizes a full silhouette into the red channel of an RG8 mask, then scene-visible fragments into its green channel. The visible pass uses LESS_EQUAL for normal depth and GREATER_EQUAL for reverse depth. Both passes disable depth/stencil writes. The full mask minus visible coverage selects the hidden color, with visible coverage taking priority when geometry overlaps. Expansion processes both channels so the soft outer edge uses the corresponding color. Per-pixel opacity uses standard source-alpha compositing.
+
+The depth resource must be from the same D3D11 device, match the target dimensions, and use a single-sampled 2D mip-zero view. The caller supplies the correct frame/camera and reverse-depth convention. Without matching depth the host renderer reports DepthUnavailable and skips the effect. CS2 can retain its native single-color fallback as described above. Microsoft documents the [depth comparison functions](https://learn.microsoft.com/en-us/windows/win32/api/d3d11/ne-d3d11-d3d11_comparison_func) and [depth/stencil state](https://learn.microsoft.com/en-us/windows/win32/api/d3d11/ns-d3d11-d3d11_depth_stencil_desc).
+
+`AwarenessDirection` extracts horizontal camera axes from the current view-projection matrix, removes projection-center offsets, and computes the bearing without dividing by clip W. This avoids flipping arrows for targets behind the camera. A vertical view uses the camera's right axis to retain a stable horizontal basis. The helper supports both CS2 Z-up and the demo's Y-up coordinates.
+
+## Verification
+
+GPU tests cover a continuous surface that is partially obstructed, visible/hidden color separation, reverse depth, depth equality, overlapping geometry, opacity and missing-depth suppression. All passes are checked against the original scene depth/stencil bytes. The DLL demo checks submitted model/depth integration, graphics-state restoration and independent color configuration. Awareness tests cover front/right/behind bearings, camera rotation, height, vertical views, projection offsets, invalid inputs and viewport placement. The smoke test operates the actual awareness controls, checks rendered pixels and Save/Load.
+
+All 23 Release suites passed. The additional native packet tests cover CsgoForward selection, rejected depth/first-person passes, ownership and team filters, packet preservation, material order and independent alpha. A September 11, 2026 background check compiled the same native module into a temporary companion: 800 samples, 731 samples with successful draw activity, 35,904 eligible packets and up to nine selected scene objects. The hook stopped successfully, the temporary DLL was unloaded, and OverlaySettings.ini matched its original SHA-256 afterward. The user confirmed white visible fill and purple hidden fill appeared. This verifies the native module in that running session; loading the complete replacement DLL requires a fresh session. Other maps, settings and frame-time performance were not exhaustively tested.

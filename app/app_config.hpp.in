@@ -1,0 +1,8 @@
+#pragma once
+namespace vortex {
+inline constexpr char AppName[] = "@VORTEX_NAME@";
+inline constexpr char AppVersion[] = "@PROJECT_VERSION@";
+inline constexpr char AppId[] = "@VORTEX_ID@";
+inline constexpr char UpdateUrl[] = "@VORTEX_UPDATE_URL@";
+inline constexpr char UpdateChannel[] = "@VORTEX_CHANNEL@";
+}

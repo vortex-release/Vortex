@@ -1,0 +1,18 @@
+VORTEX
+
+Open Vortex.exe or use its Desktop shortcut.
+Launch: open Counter-Strike 2, select its process, then click Launch overlay.
+Insert opens the in-game menu; Home toggles the overlay.
+Open preview runs the simulated scene.
+Overview > My profiles: create, load, rename, duplicate, archive, import and export settings.
+
+Installed Vortex checks public GitHub Releases on startup and every six hours.
+Updates never require a GitHub account. Open Updates, download, then Install and restart.
+Close the game and preview before installing; Vortex never kills them.
+Network failures leave your current application usable.
+Install VortexSetup.exe once to enable managed upgrades. Portable copies cannot replace themselves.
+
+Settings: %LOCALAPPDATA%\Vortex\OverlaySettings.ini
+Named profiles: %LOCALAPPDATA%\Vortex\profiles
+Logs: %LOCALAPPDATA%\Vortex\logs
+Downloads: https://github.com/vortex-release/Vortex/releases/latest

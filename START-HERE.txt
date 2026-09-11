@@ -1,0 +1,28 @@
+VORTEX 3.16
+
+Open Vortex.exe or use the Vortex desktop shortcut.
+Launch: open Counter-Strike 2, select its process, then click Launch overlay.
+Press Insert in the game to open the menu. Home toggles the overlay.
+Open preview runs the simulated scene.
+
+Overview: Signature, Focus, and Broadcast presets, palette cleanup, and Undo.
+Players: labels, health, weapons, model effects, colors, and awareness.
+Aim & recoil: tracking, weapon compensation, input calibration, and camera FOV.
+Trajectories: bullet tracers, throw previews, and flight trails.
+World: contrast, utility areas, particles, and motion.
+Feedback: hitmarkers, damage, sounds, and objective information.
+Settings: appearance, interface, and runtime diagnostics.
+Save stores your choices. Enable Auto-save to keep changes automatically.
+
+Updates appear when the publisher has configured a public update service.
+Close the game and preview before selecting Install and restart.
+If the update server is offline, the installed app continues to work.
+This local preview installer has no public update URL yet.
+
+Profiles: %LOCALAPPDATA%\Vortex\OverlaySettings.ini
+Logs: %LOCALAPPDATA%\Vortex\logs
+Older Desktop\CS2-Observer-Overlay profiles are imported once.
+
+All 35 automated checks passed; live CS2 tracer/recoil behavior still needs testing.
+The native capture hooks are checked against the supported game build.
+A different game build is reported in Diagnostics rather than using guessed offsets.

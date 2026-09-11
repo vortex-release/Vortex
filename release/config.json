@@ -1,0 +1,10 @@
+{
+  "name": "Vortex",
+  "id": "Joshu.Vortex",
+  "version": "3.23.1",
+  "publisher": "Vortex",
+  "updateUrl": "https://github.com/vortex-release/Vortex",
+  "channel": "win",
+  "port": 17843,
+  "velopackVersion": "1.2.0"
+}
