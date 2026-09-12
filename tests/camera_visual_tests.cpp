@@ -1,4 +1,5 @@
 #include "camera_visuals.hpp"
+#include "assist_input_state.hpp"
 #include "scene_style.hpp"
 #include "snapshot_worker.hpp"
 #include <atomic>
@@ -45,6 +46,58 @@ int main() {
     camera_visuals::Options options;
     Check(camera_visuals::Valid(options) && !options.thirdPerson && !options.viewmodelEnabled && !options.hideScoped,
           "camera effects default off with valid settings");
+    {
+        auto camera = options;
+        camera.thirdPerson = 1;
+        Check(camera_visuals::ThirdPersonActive(camera, false, false, false),
+              "legacy Always mode remains active without a held key");
+        camera.thirdPersonMode = 1;
+        Check(!camera_visuals::ThirdPersonActive(camera, false, true, false),
+              "Hold mode stays first-person before the key press");
+        Check(camera_visuals::ThirdPersonActive(camera, true, true, false),
+              "holding the camera key activates third person");
+        Check(!camera_visuals::ThirdPersonActive(camera, false, true, false),
+              "key release returns to first person without a latched toggle");
+        Check(!camera_visuals::ThirdPersonActive(camera, true, false, false),
+              "menu, chat or lost focus pauses a held third-person key");
+        Check(!camera_visuals::ThirdPersonActive(camera, true, true, true),
+              "scope preserves first person by default even with the key held");
+        camera.whileScoped = 1;
+        Check(camera_visuals::ThirdPersonActive(camera, true, true, true),
+              "keep while scoped also honors held activation");
+        camera.thirdPerson = 0;
+        Check(!camera_visuals::ThirdPersonActive(camera, true, true, false), "master toggle disables held camera");
+        camera.thirdPerson = 1;
+        camera.thirdPersonKey = 256;
+        Check(!camera_visuals::Valid(camera), "wheel pulse cannot be configured as a held camera key");
+        camera.thirdPersonKey = 0;
+        Check(!camera_visuals::Valid(camera), "empty camera key is rejected");
+        camera.thirdPersonKey = 4;
+        camera.thirdPersonMode = 2;
+        Check(!camera_visuals::Valid(camera), "unknown camera activation mode is rejected");
+    }
+    {
+        camera_visuals::Options camera;
+        camera.thirdPerson = camera.thirdPersonMode = 1;
+        camera.thirdPersonKey = VK_SPACE;
+        assist::PhysicalInput physical;
+        physical.Event(WM_KEYDOWN, VK_SPACE, 0);
+        physical.Event(WM_KEYUP, VK_SPACE, 0, assist::InputTag);
+        auto keys = physical.Snapshot();
+        Check(camera_visuals::ThirdPersonActive(camera, keys.Held(camera.thirdPersonKey), !keys.textInput, false),
+              "synthetic jump release cannot cancel a physically held camera key");
+        physical.Event(WM_KEYUP, VK_SPACE, 0);
+        keys = physical.Snapshot();
+        Check(!camera_visuals::ThirdPersonActive(camera, keys.Held(camera.thirdPersonKey), !keys.textInput, false),
+              "physical release clears third-person activation");
+        physical.Event(WM_KEYDOWN, VK_SPACE, 0);
+        physical.Event(WM_KEYDOWN, 'Y', 0);
+        keys = physical.Snapshot();
+        Check(!camera_visuals::ThirdPersonActive(camera, keys.Held(camera.thirdPersonKey), !keys.textInput, false),
+              "opening chat pauses the held camera binding");
+        physical.Event(WM_KILLFOCUS, 0, 0);
+        Check(!physical.Snapshot().Held(camera.thirdPersonKey), "focus loss clears the physical camera key");
+    }
     const auto back = camera_visuals::Offset({0, 0, 0}, options);
     Check(Near(back.x, -100) && Near(back.y, 0) && Near(back.z, 8), "camera arm uses Source pitch and yaw axes");
     options.shoulder = 20;

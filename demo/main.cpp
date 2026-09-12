@@ -855,14 +855,19 @@ void Smoke(Graphics &g, const std::filesystem::path &directory) {
             clickItem("Bullets");
             SaveBitmap(directory / L"vortex-tracers.bmp", g.ReadPixels(), g.width, g.height);
             const auto initialShotGlow = GetPrivateProfileIntW(L"Visual", L"paths.shotGlow", 99, profile.path.c_str());
-            const auto initialTrailGlow = GetPrivateProfileIntW(L"Visual", L"paths.trailGlow", 99, profile.path.c_str());
-            const auto initialPreviewGlow = GetPrivateProfileIntW(L"Visual", L"paths.previewGlow", 99, profile.path.c_str());
+            const auto initialTrailGlow =
+                GetPrivateProfileIntW(L"Visual", L"paths.trailGlow", 99, profile.path.c_str());
+            const auto initialPreviewGlow =
+                GetPrivateProfileIntW(L"Visual", L"paths.previewGlow", 99, profile.path.c_str());
             Require(initialShotGlow <= 1, "saved bullet glow is a valid toggle");
             clickItem("Glow");
             clickItem("Save");
-            Require(GetPrivateProfileIntW(L"Visual", L"paths.shotGlow", 99, profile.path.c_str()) == 1 - initialShotGlow &&
-                        GetPrivateProfileIntW(L"Visual", L"paths.trailGlow", 99, profile.path.c_str()) == initialTrailGlow &&
-                        GetPrivateProfileIntW(L"Visual", L"paths.previewGlow", 99, profile.path.c_str()) == initialPreviewGlow,
+            Require(GetPrivateProfileIntW(L"Visual", L"paths.shotGlow", 99, profile.path.c_str()) ==
+                            1 - initialShotGlow &&
+                        GetPrivateProfileIntW(L"Visual", L"paths.trailGlow", 99, profile.path.c_str()) ==
+                            initialTrailGlow &&
+                        GetPrivateProfileIntW(L"Visual", L"paths.previewGlow", 99, profile.path.c_str()) ==
+                            initialPreviewGlow,
                     "bullet glow toggles independently of utility glow");
             clickItem("Glow");
             clickItem("Assists");
@@ -894,6 +899,38 @@ void Smoke(Graphics &g, const std::filesystem::path &directory) {
             clickItem("Save");
             Require(GetPrivateProfileIntW(L"Visual", L"cameraFovEnabled", 0, profile.path.c_str()) == 1,
                     "camera control saves in aim page");
+            TrackingConfiguration beforeCameraBind;
+            Check(p.getTracking(&beforeCameraBind), "read tracking key before third-person bind");
+            clickItem("Third-person camera");
+            clickItem("Camera activation");
+            for (WPARAM key : {static_cast<WPARAM>(VK_DOWN), static_cast<WPARAM>(VK_RETURN)}) {
+                SendMessageW(window, WM_KEYDOWN, key, 0);
+                g.Clear();
+                Check(g.chain->Present(0, 0), "camera activation selection");
+                SendMessageW(window, WM_KEYUP, key, 0);
+                g.Clear();
+                Check(g.chain->Present(0, 0), "camera activation key release");
+            }
+            clickItem("Set camera key");
+            // Wheel input must leave the capture waiting; F6 is the actual held key.
+            SendMessageW(window, WM_MOUSEWHEEL, MAKEWPARAM(0, WHEEL_DELTA), 0);
+            g.Clear();
+            Check(g.chain->Present(0, 0), "ignore wheel as hold binding");
+            SendMessageW(window, WM_KEYDOWN, VK_F6, 0);
+            g.Clear();
+            Check(g.chain->Present(0, 0), "capture third-person hold key");
+            SendMessageW(window, WM_KEYUP, VK_F6, 0);
+            g.Clear();
+            Check(g.chain->Present(0, 0), "release captured third-person key");
+            clickItem("Save");
+            TrackingConfiguration afterCameraBind;
+            Check(p.getTracking(&afterCameraBind), "read tracking key after third-person bind");
+            Require(GetPrivateProfileIntW(L"Visual", L"cameraVisuals.thirdPersonMode", 99, profile.path.c_str()) == 1 &&
+                        GetPrivateProfileIntW(L"Visual", L"cameraVisuals.thirdPersonKey", 0, profile.path.c_str()) ==
+                            VK_F6 &&
+                        beforeCameraBind.hotkey == afterCameraBind.hotkey,
+                    "third-person hold capture saves separately without changing tracking binding");
+            clickItem("Third-person camera");
             clickItem("World");
             clickItem("Footsteps");
             SaveBitmap(directory / L"vortex-footsteps.bmp", g.ReadPixels(), g.width, g.height);

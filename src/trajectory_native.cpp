@@ -73,7 +73,8 @@ struct Native {
     bool viewHook{}, eventHook{}, tracerHook{};
     double nextLog{};
     std::uint32_t previousShots{}, previousOwner{};
-    std::atomic<bool> recoilActive{};
+    std::atomic<bool> recoilActive{}, cameraInputActive{};
+    std::atomic<std::uint32_t> cameraHeldKey{};
     bool havePrediction{};
     flight::Throw previousThrow;
     double previousRecoil{};
@@ -372,7 +373,17 @@ void AfterSetup(std::uintptr_t view) {
         if (SetViewVector(view + abi::ViewAnglesField, angles, raw))
             angles = raw;
     }
-    if (alive && haveView && settings.cameraVisuals.thirdPerson && (!zoomed || settings.cameraVisuals.whileScoped) &&
+    const auto &camera = settings.cameraVisuals;
+    bool cameraHeld{}, cameraInput = state.cameraInputActive;
+    if (camera.thirdPerson && camera.thirdPersonMode == 1 && cameraInput) {
+        DWORD foregroundProcess{};
+        GetWindowThreadProcessId(GetForegroundWindow(), &foregroundProcess);
+        cameraInput = foregroundProcess == GetCurrentProcessId();
+        // The window bridge ignores our injected inputs. A synthetic Jump key-up
+        // must not release the camera while the user is still physically holding it.
+        cameraHeld = cameraInput && state.cameraHeldKey == camera.thirdPersonKey;
+    }
+    if (alive && haveView && camera_visuals::ThirdPersonActive(camera, cameraHeld, cameraInput, zoomed) &&
         state.sweepLayout) {
         TraceContext cameraTrace;
         cameraTrace.radius = 6;
@@ -834,7 +845,8 @@ HRESULT StartTrajectories() noexcept {
         return E_FAIL;
     return S_OK;
 }
-void ConfigureTrajectories(const VisualOptions &settings, bool fresh, bool recoilActive) noexcept {
+void ConfigureTrajectories(const VisualOptions &settings, bool fresh, bool controlsActive,
+                           bool thirdPersonHeld) noexcept {
     if (!state.installed)
         return;
     {
@@ -865,7 +877,9 @@ void ConfigureTrajectories(const VisualOptions &settings, bool fresh, bool recoi
         state.settings = settings;
         state.output.tracers.SetLifetime(settings.paths.shotLifetime);
     }
-    state.recoilActive = fresh && recoilActive;
+    state.recoilActive = fresh && controlsActive;
+    state.cameraInputActive = fresh && controlsActive;
+    state.cameraHeldKey = fresh && controlsActive && thirdPersonHeld ? settings.cameraVisuals.thirdPersonKey : 0;
     state.deadline = fresh ? GetTickCount64() + 250 : 0;
 }
 void RefreshTrajectoryInputs() noexcept {
@@ -888,6 +902,8 @@ void RefreshTrajectoryInputs() noexcept {
 }
 void PauseTrajectories() noexcept {
     state.deadline = 0;
+    state.cameraInputActive = false;
+    state.cameraHeldKey = 0;
 }
 void CopyTrajectories(FlightSnapshot &out, DeferredLog *logger) noexcept {
     const auto now = Seconds();

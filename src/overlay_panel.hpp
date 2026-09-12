@@ -35,7 +35,7 @@ struct PanelInformation {
     awareness::TrackingState trackingState{};
     awareness::EffectsState effectsState{};
     std::uint32_t bonePositions{}, failedBoneReads{}, skeletonPlayers{};
-    bool waitingForBind{};
+    bool waitingForBind{}, waitingForThirdPersonBind{};
     std::uint64_t tracerCallbacks{}, acceptedTracers{}, recoilWrites{};
     bool recoilInput{};
     HRESULT recoilResult{S_FALSE};
@@ -76,7 +76,7 @@ struct PanelActions {
     awareness::profiles::Request profile;
     ImVec4 menuBounds{};
     bool rescan{}, save{}, load{}, reset{}, browse{}, reloadBackground{};
-    bool beginBind{}, browseSound{}, testSound{}, previewVisible{};
+    bool beginBind{}, beginThirdPersonBind{}, browseSound{}, testSound{}, previewVisible{};
     bool browseHitSound{}, testHitSound{};
     float previewDrag{};
 };
@@ -1086,6 +1086,7 @@ inline bool DrawOverlayPanel(awareness::Configuration &c, awareness::VisualOptio
                     {"Recoil control", "rcs rifle smg weapon", "Recoil", 2},
                     {"Motion prediction", "lag latency compensation", "Latency", 2},
                     {"Camera FOV", "view zoom third person shoulder viewmodel scoped", "Camera", 2},
+                    {"Third-person camera", "third person hold key bind distance shoulder", "Camera", 2},
                     {"Lineups", "grenade helper import export guides", "Lineups", 3},
                     {"World materials", "map tint dusk brightness", "Materials", 4},
                     {"Pistol repeat", "automatic semi auto pistol hold", "Assisted Shoot", 2},
@@ -1297,6 +1298,28 @@ inline bool DrawOverlayPanel(awareness::Configuration &c, awareness::VisualOptio
                     }
                     changed |= FlagControl("Third-person camera", camera.thirdPerson);
                     if (camera.thirdPerson) {
+                        if (BeginForm("Third-person activation")) {
+                            int mode = static_cast<int>(camera.thirdPersonMode);
+                            if (ComboRow("Camera activation", mode, "Always\0Hold key\0")) {
+                                camera.thirdPersonMode = static_cast<std::uint32_t>(mode);
+                                changed = true;
+                            }
+                            if (camera.thirdPersonMode == 1) {
+                                FormRow("Hold key");
+                                if (info.waitingForThirdPersonBind)
+                                    ImGui::TextUnformatted("Press a key or mouse button...");
+                                else {
+                                    ImGui::TextUnformatted(binding::Name(camera.thirdPersonKey).c_str());
+                                    ImGui::SameLine();
+                                    if (studio::Button("Set camera key"))
+                                        actions.beginThirdPersonBind = true;
+                                }
+                                ImGui::PopID();
+                            }
+                            ImGui::EndTable();
+                        }
+                        if (camera.thirdPersonMode == 1)
+                            studio::Tip("Hold to use third person; release to return.");
                         changed |= FlagControl("Keep while scoped", camera.whileScoped);
                         if (BeginForm("Camera position")) {
                             changed |= FloatRow("Distance", camera.distance, 30, 200, "%.0f");

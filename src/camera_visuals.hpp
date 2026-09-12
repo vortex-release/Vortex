@@ -5,18 +5,27 @@
 namespace awareness::camera_visuals {
 struct Options {
     std::uint32_t thirdPerson{}, whileScoped{}, removeRecoil{}, scopedFovEnabled{};
+    std::uint32_t thirdPersonMode{}, thirdPersonKey{4}; // Always / hold; middle mouse by default.
     float distance{100}, shoulder{}, height{8}, scopedFov{45};
     std::uint32_t viewmodelEnabled{}, hideScoped{};
     float viewmodelFov{68};
     Vector3 viewmodelOffset{};
 };
+inline constexpr bool ValidHoldKey(std::uint32_t key) noexcept {
+    return key > 0 && key < 256;
+}
 inline bool Valid(const Options &s) noexcept {
     const auto range = [](float x, float a, float b) { return std::isfinite(x) && x >= a && x <= b; };
-    return s.thirdPerson <= 1 && s.whileScoped <= 1 && s.removeRecoil <= 1 && s.scopedFovEnabled <= 1 &&
-           s.viewmodelEnabled <= 1 && s.hideScoped <= 1 && range(s.viewmodelFov, 40, 120) &&
-           range(s.viewmodelOffset.x, -10, 10) && range(s.viewmodelOffset.y, -10, 10) &&
-           range(s.viewmodelOffset.z, -10, 10) && range(s.distance, 30, 200) && range(s.shoulder, -50, 50) &&
-           range(s.height, -20, 40) && range(s.scopedFov, 10, 90);
+    return s.thirdPerson <= 1 && s.thirdPersonMode <= 1 && ValidHoldKey(s.thirdPersonKey) && s.whileScoped <= 1 &&
+           s.removeRecoil <= 1 && s.scopedFovEnabled <= 1 && s.viewmodelEnabled <= 1 && s.hideScoped <= 1 &&
+           range(s.viewmodelFov, 40, 120) && range(s.viewmodelOffset.x, -10, 10) &&
+           range(s.viewmodelOffset.y, -10, 10) && range(s.viewmodelOffset.z, -10, 10) && range(s.distance, 30, 200) &&
+           range(s.shoulder, -50, 50) && range(s.height, -20, 40) && range(s.scopedFov, 10, 90);
+}
+inline bool ThirdPersonActive(const Options &s, bool held, bool inputActive, bool scoped) noexcept {
+    // Legacy profiles retain Always mode. Hold mode never latches across release,
+    // menu/chat entry or focus loss, and keeps the independent scope preference.
+    return Valid(s) && s.thirdPerson && (!scoped || s.whileScoped) && (s.thirdPersonMode == 0 || (inputActive && held));
 }
 inline bool FiniteVector(Vector3 v) noexcept {
     return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);

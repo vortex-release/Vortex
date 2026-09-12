@@ -324,6 +324,8 @@ constexpr Field visuals[]{
     F(cameraVisuals.viewmodelOffset.y),
     F(cameraVisuals.viewmodelOffset.z),
     U(cameraVisuals.thirdPerson),
+    U(cameraVisuals.thirdPersonMode),
+    U(cameraVisuals.thirdPersonKey),
     U(cameraVisuals.whileScoped),
     U(cameraVisuals.removeRecoil),
     U(cameraVisuals.scopedFovEnabled),

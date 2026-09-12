@@ -63,6 +63,8 @@ int main(int argc, char **argv) {
     visual.lineups.color = {.3f, .5f, .7f, .8f};
     strcpy_s(visual.lineups.mapOverride, "de_mirage");
     visual.cameraVisuals.thirdPerson = 1;
+    visual.cameraVisuals.thirdPersonMode = 1;
+    visual.cameraVisuals.thirdPersonKey = VK_XBUTTON2;
     visual.cameraVisuals.whileScoped = 1;
     visual.cameraVisuals.removeRecoil = 1;
     visual.cameraVisuals.scopedFovEnabled = 1;
@@ -249,7 +251,8 @@ int main(int argc, char **argv) {
     check(loadedVisual.weather.enabled == 1 && loadedVisual.weather.kind == 2 && loadedVisual.weather.density == 0 &&
               loadedVisual.scoreboard == visual.scoreboard,
           "weather and scoreboard profile round-trip");
-    check(loadedVisual.cameraVisuals.thirdPerson && loadedVisual.cameraVisuals.whileScoped &&
+    check(loadedVisual.cameraVisuals.thirdPerson && loadedVisual.cameraVisuals.thirdPersonMode == 1 &&
+              loadedVisual.cameraVisuals.thirdPersonKey == VK_XBUTTON2 && loadedVisual.cameraVisuals.whileScoped &&
               loadedVisual.cameraVisuals.removeRecoil && loadedVisual.cameraVisuals.scopedFovEnabled &&
               loadedVisual.cameraVisuals.distance == 130 && loadedVisual.cameraVisuals.shoulder == -25 &&
               loadedVisual.cameraVisuals.height == 15 && loadedVisual.cameraVisuals.scopedFov == 55 &&
@@ -258,6 +261,15 @@ int main(int argc, char **argv) {
               loadedVisual.assists.strafeMode == 1 && loadedVisual.assists.autoPistol &&
               loadedVisual.assists.pistolIntervalMs == 150 && loadedVisual.worldVisuals.dropAmmo,
           "camera, movement mode, pistol cadence and magazine settings round-trip");
+    WritePrivateProfileStringW(L"Visual", L"cameraVisuals.thirdPersonMode", nullptr, path.c_str());
+    WritePrivateProfileStringW(L"Visual", L"cameraVisuals.thirdPersonKey", nullptr, path.c_str());
+    check(LoadSettings(path, loaded, loadedVisual, &loadedTracking, &loadedEffects) &&
+              loadedVisual.cameraVisuals.thirdPerson && loadedVisual.cameraVisuals.thirdPersonMode == 0 &&
+              loadedVisual.cameraVisuals.thirdPersonKey == VK_MBUTTON,
+          "old third-person profiles retain Always mode and a valid default hold key");
+    check(SaveSettings(path, config, visual, tracking, effects) &&
+              LoadSettings(path, loaded, loadedVisual, &loadedTracking, &loadedEffects),
+          "restore camera hold settings after legacy-profile check");
     check(loadedVisual.sessionBadge == 0 && loadedVisual.badgeLight == 0 && loadedVisual.badgeScale == 1.25f &&
               loadedVisual.badgeOpacity == .7f,
           "badge appearance round trips");

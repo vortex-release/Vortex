@@ -1,0 +1,25 @@
+{
+  "version": "3.27.4",
+  "phase": "Focused offline preflight; full integration and packaging are required by release.ps1 before push",
+  "verifiedAtUtc": "2026-09-12T05:18:09.4836636Z",
+  "cameraVisualChecks": 116,
+  "cameraVisualFailures": 0,
+  "focusedSuitesPassed": [
+    "awareness_camera_visuals",
+    "awareness_settings"
+  ],
+  "requiredIntegratedSuiteCount": 54,
+  "liveGameplayVerified": false,
+  "gameLaunched": false,
+  "gameInspected": false,
+  "activeSettingsPreserved": true,
+  "activeSettingsSha256": "A67CE5B3F513338E35F1BC5B9F1C46C178C4EACF8377DC76AFAB66333442C50C",
+  "integrationNotes": "docs/camera-hold-3.27.4.md",
+  "releaseWorkflow": ".github/workflows/release.yml",
+  "packagingVerification": "release.ps1 builds the native DLL and demo, runs all 54 suites including menu capture, validates installer/feed/checksums, and only then commits and pushes the release tag",
+  "limitations": [
+    "No live game verification",
+    "Hold changes reach the next view setup after physical-input snapshot publication",
+    "Existing camera geometry/build/trace limits remain unchanged"
+  ]
+}

@@ -1,9 +1,8 @@
-# Vortex 3.27.3
+# Vortex 3.27.4
 
-- Combined Jumper and Strafer in Assists > Movement, with separate switches and shared controls visible in both steering modes.
-- Preserved the initial physical jump press instead of canceling it immediately. Re-jumps arm during flight, avoid repeated presses on a stalled known tick, and restore held Space when control is disabled.
-- Fixed A/D steering stalling while forward input is held. Finite camera yaw remains usable after full rotations, and skipped/raced camera writes no longer count as successful turns.
-- Fixed historical shot counts keeping Strafer paused after recoil activity ends. Camera and key handoffs retain physical input priority.
-- Reduced the worker wait to 1 ms only while Jumper and physical Space are active, with movement-only memory reads when combat data is unnecessary.
+- Added an Always / Hold key selector for third-person camera under Assists > Camera.
+- Added an independent keyboard/mouse binding, defaulting to Middle Mouse. Hold the selected button for third person; release it to return. Wheel pulses cannot be used as a held key.
+- Hold mode pauses for the menu, chat, focus loss and the existing scoped-camera preference. It reads physical input, so Jumper's synthetic Space releases do not interfere with a Space camera binding.
+- Existing third-person distance, shoulder, height and collision handling are retained. Older profiles keep Always mode, and camera tracking retains its separate binding.
 
-This remains a Windows-input assist, not a tick/subtick-synchronized movement hook. Perfect jump timing or maximum velocity is not guaranteed. Settings are preserved; offline validation only, with no game launch or inspection.
+Settings are preserved. Validation uses offline fixtures and release builds; no live CS2 launch or inspection is performed.

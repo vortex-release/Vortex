@@ -173,6 +173,7 @@ class Renderer {
     ImGuiContext *imgui_{};
     bool backendReady_{};
     bool previewVisible_{true};
+    bool captureThirdPersonKey_{};
     ImFont *font_{};
     ImFont *uiFont_{};
     ImFont *customFont_{};
@@ -408,8 +409,19 @@ class Renderer {
         }
         bridge.FeedInput(io, io.DisplaySize.x, io.DisplaySize.y);
         if (const auto captured = bridge.TakeBinding()) {
-            tracking.hotkey = captured;
-            edited = true;
+            if (captureThirdPersonKey_) {
+                if (camera_visuals::ValidHoldKey(captured)) {
+                    visual.cameraVisuals.thirdPersonKey = captured;
+                    edited = true;
+                } else if (bridge.Visible()) {
+                    // Wheel pulses cannot be held. Keep waiting for a physical
+                    // keyboard/mouse button rather than saving an unusable bind.
+                    bridge.BeginBindCapture();
+                }
+            } else {
+                tracking.hotkey = captured;
+                edited = true;
+            }
         }
         ImGui_ImplDX11_NewFrame();
         ImGui::NewFrame();
@@ -429,12 +441,16 @@ class Renderer {
                 steamProfile_.Name(),
                 steamProfile_.Connected()};
             auto panelInfo = info;
-            panelInfo.waitingForBind = bridge.WaitingForBind();
+            const bool waiting = bridge.WaitingForBind();
+            panelInfo.waitingForBind = waiting && !captureThirdPersonKey_;
+            panelInfo.waitingForThirdPersonBind = waiting && captureThirdPersonKey_;
             edited |= DrawOverlayPanel(c, visual, panelInfo, open, actions, weapons_.Texture(), tracking, effects,
                                        media, bridge.Visible());
             previewVisible_ = actions.previewVisible;
-            if (actions.beginBind)
+            if (actions.beginBind || actions.beginThirdPersonBind) {
+                captureThirdPersonKey_ = actions.beginThirdPersonBind;
                 bridge.BeginBindCapture();
+            }
             if (actions.browse)
                 menuBackground_.Browse();
             if (actions.reloadBackground)
@@ -1113,9 +1129,10 @@ struct Runtime {
         auto &flightData = flightScratch;
         ResetInPlace(flightData);
         if (useCs2) {
+            const auto cameraKeys = bridge.AssistKeys();
             cs2::ConfigureTrajectories(visual, fresh && c.enabled,
-                                       !bridge.Visible() && !bridge.AssistKeys().textInput &&
-                                           GetForegroundWindow() == window);
+                                       !bridge.Visible() && !cameraKeys.textInput && GetForegroundWindow() == window,
+                                       cameraKeys.Held(visual.cameraVisuals.thirdPersonKey));
             cs2::RefreshTrajectoryInputs();
             cs2::CopyTrajectories(flightData, &diagnosticLog);
             info.predictionStatus = cs2::PredictionStateName(flightData.predictionState);
@@ -1321,10 +1338,12 @@ struct Runtime {
         if (actions.rescan)
             source.Rescan();
         sounds.Configure(visual.killSoundEnabled != 0, visual.killSoundPath, visual.killSoundVolume);
-        if (useCs2)
+        if (useCs2) {
+            const auto cameraKeys = bridge.AssistKeys();
             cs2::ConfigureTrajectories(visual, fresh && c.enabled && !actions.rescan,
-                                       !bridge.Visible() && !bridge.AssistKeys().textInput &&
-                                           GetForegroundWindow() == window);
+                                       !bridge.Visible() && !cameraKeys.textInput && GetForegroundWindow() == window,
+                                       cameraKeys.Held(visual.cameraVisuals.thirdPersonKey));
+        }
         if (actions.rescan) {
             trails.Clear();
             ghosts.Clear();

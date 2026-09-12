@@ -69,7 +69,7 @@ struct FlightSnapshot {
 };
 HRESULT StartTrajectories() noexcept;
 HRESULT StopTrajectories() noexcept;
-void ConfigureTrajectories(const VisualOptions &, bool fresh, bool recoilActive) noexcept;
+void ConfigureTrajectories(const VisualOptions &, bool fresh, bool controlsActive, bool thirdPersonHeld) noexcept;
 void RefreshTrajectoryInputs() noexcept;
 void PauseTrajectories() noexcept;
 void CopyTrajectories(FlightSnapshot &, DeferredLog *log = nullptr) noexcept;
