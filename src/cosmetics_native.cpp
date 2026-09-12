@@ -42,7 +42,8 @@ struct Model {
     std::uintptr_t entity{}, scene{};
     std::uint32_t handle{};
     std::uint64_t originalMask{}, appliedMask{};
-    std::array<char, 260> original{}, applied{};
+    ModelPath original{}, applied{};
+    ModelRequest request;
     bool changed{}, pending{};
     ULONGLONG retryAt{};
 };
@@ -51,7 +52,9 @@ struct Weapon {
     std::uint32_t handle{}, owner{}, originalSubclass{}, appliedSubclass{};
     ItemState original{}, applied{};
     Model model;
-    bool used{}, changed{}, seen{}, rebuildPending{};
+    PaintAttributes attributes{}, appliedAttributes{};
+    MaterialRequest material;
+    bool used{}, changed{}, seen{};
     ULONGLONG retryAt{};
 };
 struct Glove {
@@ -73,7 +76,7 @@ struct Runtime {
     std::shared_ptr<const Catalog> cachedCatalog;
     std::atomic<bool> ready{}, restoring{};
     std::atomic<NativeState> phase{NativeState::Disabled};
-    std::atomic<unsigned> applied{}, restores{}, faults{}, tracked{}, inFlight{};
+    std::atomic<unsigned> applied{}, restores{}, faults{}, tracked{}, inFlight{}, materialRefreshes{};
     std::atomic<DWORD> gameThread{};
 } runtime;
 bool SameEntity(std::uintptr_t list, std::uintptr_t entity, std::uint32_t handle) noexcept {
@@ -101,7 +104,7 @@ bool ValidImage(std::uintptr_t client) noexcept {
         nt.FileHeader.TimeDateStamp != abi::Timestamp || nt.OptionalHeader.SizeOfImage != abi::ImageSize ||
         info.SizeOfImage != abi::ImageSize)
         return false;
-    return Function(abi::SetAttributeFn) && Function(abi::RemoveAttributeFn) &&
+    return Function(abi::GetPaintFn) && Function(abi::SetAttributeFn) && Function(abi::RemoveAttributeFn) &&
            Function(abi::InvalidateDescriptionFn) && Function(abi::SetModelFn) && Function(abi::SetMaskFn) &&
            Function(abi::UpdateViewModelFn) && Function(abi::UpdateCompositeFn) && Function(abi::UpdateSkinFn);
 }
@@ -238,6 +241,15 @@ bool PendingModel(Model &model) noexcept {
     runtime.phase = NativeState::LoadingModel;
     return false;
 }
+ModelObservation ObserveModel(Model &model, const Model &current) noexcept {
+    const auto result = model.request.Observe(current.original);
+    if (result == ModelObservation::Confirmed) {
+        model.applied = model.request.target;
+        model.pending = false;
+        model.retryAt = 0;
+    }
+    return result;
+}
 bool RestoreModel(std::uintptr_t list, Model &model) noexcept {
     if (!model.changed) {
         model = {};
@@ -252,13 +264,28 @@ bool RestoreModel(std::uintptr_t list, Model &model) noexcept {
     Model current;
     if (!ReadModel(model.entity, current))
         return PendingModel(model);
-    const bool ownModel = current.original == model.applied;
+    auto observed = ObserveModel(model, current);
+    if (observed == ModelObservation::Pending)
+        return PendingModel(model);
+    if (observed == ModelObservation::Superseded) {
+        model = {}; // A distinct externally supplied model supersedes our ownership.
+        return true;
+    }
+    bool ownModel = current.original == model.applied;
     if (ownModel && model.original != model.applied) {
+        model.request.Begin(current.original, model.original);
         if (!SetModel(model.entity, model.original.data()))
             return false;
-        model.applied = model.original;
-        if (!ReadModel(model.entity, current) || current.original != model.original)
+        if (!ReadModel(model.entity, current))
             return PendingModel(model);
+        observed = ObserveModel(model, current);
+        if (observed == ModelObservation::Pending)
+            return PendingModel(model);
+        if (observed == ModelObservation::Superseded) {
+            model = {};
+            return true;
+        }
+        ownModel = current.original == model.applied;
     }
     if (ownModel && current.originalMask == model.appliedMask && model.originalMask != model.appliedMask) {
         if (!SetMask(current.scene, model.originalMask))
@@ -278,15 +305,32 @@ bool ApplyModel(Model &model, std::string_view path, std::uint64_t mask) noexcep
     Model current;
     if (!ReadModel(model.entity, current))
         return PendingModel(model);
+    auto observed = ObserveModel(model, current);
+    if (observed == ModelObservation::Pending)
+        return PendingModel(model);
+    if (observed == ModelObservation::Superseded) {
+        model.original = model.applied = current.original;
+        model.originalMask = model.appliedMask = current.originalMask;
+        model.changed = false;
+    }
     if (path != std::string_view(current.original.data())) {
-        std::array<char, 260> next{};
+        ModelPath next{};
         std::copy(path.begin(), path.end(), next.begin());
-        model.applied = next;
+        model.request.Begin(current.original, next);
         model.changed = true;
         if (!SetModel(model.entity, next.data()))
             return false;
-        if (!ReadModel(model.entity, current) || path != std::string_view(current.original.data()))
+        if (!ReadModel(model.entity, current))
             return PendingModel(model);
+        observed = ObserveModel(model, current);
+        if (observed == ModelObservation::Pending)
+            return PendingModel(model);
+        if (observed == ModelObservation::Superseded) {
+            model.original = model.applied = current.original;
+            model.originalMask = model.appliedMask = current.originalMask;
+            model.changed = false;
+            return PendingModel(model);
+        }
     }
     model.scene = current.scene;
     if (mask != current.originalMask) {
@@ -324,11 +368,21 @@ bool WeaponReady(std::uintptr_t entity) noexcept {
     }
     return true;
 }
+bool PaintMatches(std::uintptr_t view, int expected) noexcept {
+    __try {
+        return reinterpret_cast<int (*)(void *)>(runtime.client +
+                                                 abi::GetPaintFn.rva)(reinterpret_cast<void *>(view)) == expected;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        Fault();
+        return false;
+    }
+}
 bool RefreshWeapon(std::uintptr_t entity) noexcept {
     if (!WeaponReady(entity)) {
         runtime.phase = NativeState::WaitingItem;
         return false;
     }
+    runtime.materialRefreshes.fetch_add(1, std::memory_order_relaxed);
     // Current engine callsites pass entity+0x608, true. No guessed PostDataUpdate slot.
     return CallOne(abi::InvalidateDescriptionFn, entity + abi::AttributeManager + abi::ItemView) &&
            CallFlag(abi::UpdateCompositeFn, entity + abi::CompositeOwner, true) &&
@@ -360,6 +414,12 @@ bool ReadAttributes(std::uintptr_t view, std::array<AttributeState, 3> &out) noe
     return memory.Field(view, abi::AttributeCount, afterCount) && afterCount == count &&
            memory.Field(view, abi::AttributeData, afterData) && afterData == data;
 }
+bool ReadPaint(void *context, PaintAttributes &out) noexcept {
+    return ReadAttributes(reinterpret_cast<std::uintptr_t>(context), out);
+}
+bool WritePaint(void *context, unsigned slot, AttributeState value) noexcept {
+    return SetAttribute(reinterpret_cast<std::uintptr_t>(context), slot, value);
+}
 bool RestoreWeapon(std::uintptr_t list, Weapon &w) noexcept {
     if (!w.used)
         return true;
@@ -377,6 +437,9 @@ bool RestoreWeapon(std::uintptr_t list, Weapon &w) noexcept {
             runtime.phase = NativeState::WaitingItem;
             return false;
         }
+        if (!RestoreAttributes(reinterpret_cast<void *>(w.entity + abi::AttributeManager + abi::ItemView), w.attributes,
+                               w.appliedAttributes, ReadPaint, WritePaint))
+            return false;
         ItemPatch(w.entity, false, w.original, w.applied).RestoreMatching(nullptr, CompareWrite);
         std::uint32_t current{};
         if (w.originalSubclass != w.appliedSubclass && memory.Field(w.entity, abi::Subclass, current) &&
@@ -519,7 +582,9 @@ void UpdateWeapons(const Local &local, const Options &options, unsigned &budget)
         if (tracked)
             tracked->seen = true;
         ItemState current;
-        if (!ReadItem(entity, false, current) || !WeaponReady(entity))
+        PaintAttributes attributes;
+        const auto view = entity + abi::AttributeManager + abi::ItemView;
+        if (!ReadItem(entity, false, current) || !WeaponReady(entity) || !ReadAttributes(view, attributes))
             continue;
         const auto original = tracked ? tracked->original.definition : current.definition;
         const auto *definition = runtime.cachedCatalog->Find(original);
@@ -562,21 +627,46 @@ void UpdateWeapons(const Local &local, const Options &options, unsigned &budget)
             tracked->owner = owner;
             tracked->original = current;
             tracked->applied = current;
+            tracked->attributes = attributes;
+            tracked->appliedAttributes = attributes;
             tracked->used = true;
         }
         tracked->seen = true;
         const auto desired = Desired(tracked->original, *finish, definition->id, local.account);
+        const auto desiredAttributes = DesiredAttributes(*finish);
         const auto *paint = runtime.cachedCatalog->Paint(finish->paintKit);
         const bool legacy = paint && paint->legacy;
-        if ((current != desired || tracked->rebuildPending) && budget && GetTickCount64() >= tracked->retryAt) {
+        const auto now = GetTickCount64();
+        const bool newSelection = tracked->material.Select(desired);
+        if (newSelection)
+            tracked->retryAt = 0;
+        auto repair = desired;
+        // This is an engine lifecycle flag, not a user preference or a persistent material signature.
+        const bool preserveLifecycleFlag = !newSelection && tracked->changed;
+        if (preserveLifecycleFlag)
+            repair.restoreMaterial = current.restoreMaterial;
+        const bool changed = current != repair || attributes != desiredAttributes;
+        const bool refreshReady = tracked->material.Ready(now);
+        if (tracked->material.pending)
+            runtime.phase = tracked->model.pending ? NativeState::LoadingModel : NativeState::WaitingItem;
+        if ((changed || refreshReady) && budget && now >= tracked->retryAt &&
+            (!tracked->material.pending || refreshReady)) {
             --budget;
             runtime.phase = NativeState::Applying;
-            if (!ItemPatch(entity, false, current, desired).Commit(nullptr, CompareWrite))
+            tracked->retryAt = now + 250;
+            if (!ItemPatch(entity, false, current, repair).Commit(nullptr, CompareWrite))
                 continue;
-            tracked->applied = desired;
+            const auto ownedRestoreMaterial = tracked->applied.restoreMaterial;
+            tracked->applied = repair;
+            if (preserveLifecycleFlag)
+                tracked->applied.restoreMaterial = ownedRestoreMaterial;
             tracked->changed = true;
-            tracked->rebuildPending = true;
-            tracked->retryAt = GetTickCount64() + 250;
+            tracked->appliedAttributes = desiredAttributes;
+            if (!CommitAttributes(reinterpret_cast<void *>(view), attributes, desiredAttributes, ReadPaint,
+                                  WritePaint)) {
+                runtime.phase = NativeState::WaitingItem;
+                continue;
+            }
             if (knife && current.definition != desired.definition) {
                 std::uint32_t before{}, after = SubclassToken(desired.definition);
                 if (!memory.Field(entity, abi::Subclass, before) ||
@@ -588,14 +678,23 @@ void UpdateWeapons(const Local &local, const Options &options, unsigned &budget)
             }
             const auto mask = knife ? (legacy ? 1ull : 2ull) : (legacy ? 2ull : 1ull);
             if (!ApplyModel(tracked->model,
-                            knife ? definition->model : std::string_view(tracked->model.original.data()), mask) ||
-                !RefreshWeapon(entity))
+                            knife ? definition->model : std::string_view(tracked->model.original.data()), mask))
                 continue;
-            tracked->rebuildPending = false;
-            tracked->retryAt = 0;
-            runtime.applied.fetch_add(1);
+            // Network repair preserves the already rendered material. Only a new selection or a
+            // bounded initialization retry may invoke the expensive composite teardown/build.
+            if (refreshReady) {
+                if (!WeaponReady(entity) || !PaintMatches(view, desired.paint)) {
+                    runtime.phase = NativeState::WaitingItem;
+                    continue;
+                }
+                tracked->material.Attempt(now);
+                if (!RefreshWeapon(entity))
+                    continue;
+                tracked->material.Complete();
+                runtime.applied.fetch_add(1);
+            }
         }
-        if (tracked->changed && !tracked->rebuildPending)
+        if (tracked->changed && !tracked->material.pending)
             UpdateView(local, *tracked, *definition, legacy);
     }
     for (auto &w : runtime.weapons)
@@ -694,7 +793,15 @@ void UpdateAgent(const Local &local, const Options &options, unsigned &budget) n
     if (!agent.entity)
         agent = current;
     if (definition->model == std::string_view(current.original.data())) {
-        if (agent.pending) {
+        const bool wasPending = agent.pending;
+        const auto observed = ObserveModel(agent, current);
+        if (observed == ModelObservation::Pending) {
+            PendingModel(agent);
+            return;
+        }
+        if (observed == ModelObservation::Superseded)
+            agent = current;
+        if (wasPending) {
             agent.pending = false;
             agent.retryAt = 0;
             runtime.applied.fetch_add(1);
@@ -862,6 +969,7 @@ NativeStatus Status() noexcept {
     s.applied = runtime.applied.load();
     s.restores = runtime.restores.load();
     s.faults = runtime.faults.load();
+    s.materialRefreshes = runtime.materialRefreshes.load();
     return s;
 }
 CatalogController &CatalogRuntime() noexcept {

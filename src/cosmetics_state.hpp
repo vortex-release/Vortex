@@ -41,6 +41,127 @@ struct AttributeState {
     float value{};
     bool operator==(const AttributeState &) const = default;
 };
+using PaintAttributes = std::array<AttributeState, 3>;
+inline PaintAttributes DesiredAttributes(const Finish &finish) noexcept {
+    return {
+        {{true, static_cast<float>(finish.paintKit)}, {true, static_cast<float>(finish.seed)}, {true, finish.wear}}};
+}
+using ReadPaintAttributes = bool (*)(void *, PaintAttributes &) noexcept;
+using WritePaintAttribute = bool (*)(void *, unsigned, AttributeState) noexcept;
+inline bool RestoreAttributes(void *context, const PaintAttributes &original, const PaintAttributes &applied,
+                              ReadPaintAttributes read, WritePaintAttribute write) noexcept {
+    PaintAttributes current;
+    if (!read(context, current))
+        return false;
+    for (unsigned i = 0; i < current.size(); ++i) {
+        if (current[i] != applied[i] || current[i] == original[i])
+            continue;
+        if (!write(context, i, original[i]))
+            return false;
+        PaintAttributes after;
+        if (!read(context, after) || after[i] != original[i])
+            return false;
+    }
+    return true;
+}
+inline bool CommitAttributes(void *context, const PaintAttributes &before, const PaintAttributes &after,
+                             ReadPaintAttributes read, WritePaintAttribute write) noexcept {
+    PaintAttributes applied = before;
+    for (unsigned i = 0; i < before.size(); ++i) {
+        if (before[i] == after[i])
+            continue;
+        // Track the attempted value too: an engine call may partially succeed before reporting failure.
+        applied[i] = after[i];
+        if (!write(context, i, after[i])) {
+            RestoreAttributes(context, before, applied, read, write);
+            return false;
+        }
+    }
+    PaintAttributes observed;
+    if (read(context, observed) && observed == after)
+        return true;
+    RestoreAttributes(context, before, applied, read, write);
+    return false;
+}
+// Initialization/SOC/precache flags and network identity are not material inputs.
+// Their drift must never tear down an otherwise unchanged composite material.
+struct MaterialSignature {
+    std::uint16_t definition{};
+    std::int32_t paint{}, seed{}, statTrak{};
+    float wear{};
+    std::array<char, 161> name{};
+    bool operator==(const MaterialSignature &) const = default;
+};
+inline MaterialSignature Signature(const ItemState &item) noexcept {
+    return {item.definition, item.paint, item.seed, item.statTrak, item.wear, item.name};
+}
+using ModelPath = std::array<char, 260>;
+enum class ModelObservation { None, Pending, Confirmed, Superseded };
+// Issued resource requests are distinct from the last model confirmed resident.
+// The same transition is used for application and restoration.
+struct ModelRequest {
+    ModelPath source{}, target{};
+    bool active{};
+    void Begin(const ModelPath &from, const ModelPath &to) noexcept {
+        source = from;
+        target = to;
+        active = true;
+    }
+    ModelObservation Observe(const ModelPath &resident) noexcept {
+        if (!active)
+            return ModelObservation::None;
+        if (resident == target) {
+            active = false;
+            return ModelObservation::Confirmed;
+        }
+        if (resident == source)
+            return ModelObservation::Pending;
+        active = false;
+        return ModelObservation::Superseded;
+    }
+};
+// Cosmetic identity is validated on the native game thread. A brief gap in the
+// independent 2D snapshot must not restore and reapply every cosmetic material.
+struct FrameFreshness {
+    std::uint64_t lastFresh{};
+    bool seen{};
+    bool Allow(bool wanted, bool fresh, std::uint64_t now) noexcept {
+        if (!wanted || (seen && now < lastFresh)) {
+            seen = false;
+            return false;
+        }
+        if (fresh) {
+            lastFresh = now;
+            seen = true;
+        }
+        return seen && now - lastFresh <= 2000;
+    }
+};
+struct MaterialRequest {
+    MaterialSignature signature;
+    bool selected{}, pending{};
+    unsigned attempts{};
+    std::uint64_t retryAt{};
+    bool Select(const ItemState &item) noexcept {
+        const auto next = Signature(item);
+        if (selected && signature == next)
+            return false;
+        signature = next;
+        selected = pending = true;
+        attempts = 0;
+        retryAt = 0;
+        return true;
+    }
+    bool Ready(std::uint64_t now) const noexcept { return pending && attempts < 3 && now >= retryAt; }
+    void Attempt(std::uint64_t now) noexcept {
+        ++attempts;
+        retryAt = now + 250;
+    }
+    void Complete() noexcept {
+        pending = false;
+        retryAt = 0;
+    }
+};
 struct FieldPatch {
     std::uintptr_t address{};
     std::size_t size{};

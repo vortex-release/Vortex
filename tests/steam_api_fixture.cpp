@@ -1,6 +1,8 @@
 #include <Windows.h>
 #include <cstdint>
-static int token, reads;
+static int token, reads, queries, personas;
+static int avatarResult = 4;
+static bool personaAvailable = true;
 extern "C" {
 __declspec(dllexport) void *SteamAPI_SteamFriends_v018() {
     return &token;
@@ -12,13 +14,15 @@ __declspec(dllexport) void *SteamAPI_SteamUtils_v010() {
     return &token;
 }
 __declspec(dllexport) const char *SteamAPI_ISteamFriends_GetPersonaName(void *) {
-    return "Observer Demo";
+    ++personas;
+    return personaAvailable ? "Observer Demo" : nullptr;
 }
 __declspec(dllexport) std::uint64_t SteamAPI_ISteamUser_GetSteamID(void *) {
     return 76561198000000001ull;
 }
 __declspec(dllexport) int SteamAPI_ISteamFriends_GetMediumFriendAvatar(void *, std::uint64_t) {
-    return 4;
+    ++queries;
+    return avatarResult;
 }
 __declspec(dllexport) bool SteamAPI_ISteamUtils_GetImageSize(void *, int image, UINT *width, UINT *height) {
     *width = *height = 64;
@@ -42,5 +46,17 @@ __declspec(dllexport) bool SteamAPI_ISteamUtils_GetImageRGBA(void *, int image, 
 }
 __declspec(dllexport) int FixtureAvatarReads() {
     return reads;
+}
+__declspec(dllexport) int FixtureAvatarQueries() {
+    return queries;
+}
+__declspec(dllexport) int FixturePersonaQueries() {
+    return personas;
+}
+__declspec(dllexport) void FixtureSetAvatarResult(int image) {
+    avatarResult = image;
+}
+__declspec(dllexport) void FixtureSetPersonaAvailable(bool available) {
+    personaAvailable = available;
 }
 }

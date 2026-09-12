@@ -41,8 +41,17 @@ try {
     $stage = Join-Path $root ('staging\' + [Guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $stage -Force | Out-Null
     $app = Join-Path $BuildDirectory 'app\Release'
-    foreach ($name in @('Vortex.exe','ObserverDemo.exe','EntityAwarenessOverlay.dll','velopack_libc.dll','DefaultSettings.ini')) {
-        Copy-Item -LiteralPath (Join-Path $app $name) -Destination $stage
+    # Package canonical outputs directly. A DLL-only rebuild need not relink the
+    # launcher, so its POST_BUILD staging directory can still contain an older DLL.
+    $payload = @{
+        'Vortex.exe' = Join-Path $app 'Vortex.exe'
+        'ObserverDemo.exe' = Join-Path $BuildDirectory 'Release\ObserverDemo.exe'
+        'EntityAwarenessOverlay.dll' = Join-Path $BuildDirectory 'Release\EntityAwarenessOverlay.dll'
+        'velopack_libc.dll' = Join-Path $project 'dependencies\velopack\lib\velopack_libc_win_x64_msvc.dll'
+        'DefaultSettings.ini' = Join-Path $project 'DefaultSettings.ini'
+    }
+    foreach ($name in $payload.Keys) {
+        Copy-Item -LiteralPath $payload[$name] -Destination (Join-Path $stage $name)
     }
     $profileStage = Join-Path $stage 'profile'
     New-Item -ItemType Directory -Path $profileStage -Force | Out-Null

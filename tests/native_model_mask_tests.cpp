@@ -13,6 +13,7 @@ using Microsoft::WRL::ComPtr;
 extern "C" void VortexTestReplay(ID3D11DeviceContext *, UINT, UINT, UINT, INT, UINT, std::uintptr_t);
 extern "C" char VortexTestReplayReturn;
 namespace {
+void STDMETHODCALLTYPE UnusedExternalEnd(ID3D11DeviceContext *, ID3D11Asynchronous *) {}
 constexpr char Shader[] = R"(
 cbuffer Shape:register(b0){float4 shape;};
 float4 VS(uint id:SV_VertexID,uint instance:SV_InstanceID):SV_POSITION{
@@ -147,6 +148,16 @@ int main() {
         const auto baseline = read(color.Get());
         check(pixel(baseline, 48, 48, 1) > 250, "baseline indexed-instance geometry and stack arguments are valid");
         check(MH_Initialize() == MH_OK, "MinHook initialized");
+        // A conflict at the last target must roll back every newly created hook,
+        // including ones queued but not yet activated, without removing its owner.
+        auto **contextTable = *reinterpret_cast<void ***>(context.Get());
+        void *externalOriginal{};
+        void *externalTarget = contextTable[28];
+        check(MH_CreateHook(externalTarget, reinterpret_cast<void *>(&UnusedExternalEnd), &externalOriginal) == MH_OK,
+              "external inactive hook reserves final query target");
+        check(FAILED(scene_depth::Start(device.Get(), context.Get(), 96, 96)),
+              "late hook conflict rejects the complete capture installation");
+        check(MH_RemoveHook(externalTarget) == MH_OK, "rollback preserves an existing external hook");
         require(scene_depth::Start(device.Get(), context.Get(), 96, 96));
         for (unsigned reversed = 0; reversed < 2; ++reversed) {
             require(native_mask::Render(device.Get(), context.Get(), target.Get(), desc, dsv.Get(), reversed, true,

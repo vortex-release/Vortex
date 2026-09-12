@@ -22,7 +22,7 @@ enum class NativeState : std::uint8_t {
 struct NativeStatus {
     NativeState state{NativeState::Disabled};
     bool weapons{}, knives{}, gloves{}, agents{};
-    std::uint32_t tracked{}, applied{}, restores{}, faults{};
+    std::uint32_t tracked{}, applied{}, restores{}, faults{}, materialRefreshes{};
 };
 const char *Name(NativeState state) noexcept;
 bool Initialize(std::uintptr_t client) noexcept;

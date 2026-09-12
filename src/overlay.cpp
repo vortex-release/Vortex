@@ -11,6 +11,7 @@
 #include "viewmodel_native.hpp"
 #include "game_frame.hpp"
 #include "cosmetics_native.hpp"
+#include "cosmetics_state.hpp"
 #include "weather_native.hpp"
 #include "scoreboard_native.hpp"
 #include "native_model_mask.hpp"
@@ -164,6 +165,7 @@ class SceneScope {
 };
 
 class Renderer {
+    DeferredLog &log_;
     ComPtr<ID3D11Device1> device_;
     ComPtr<ID3D11DeviceContext1> context_;
     ComPtr<ID3DDeviceContextState> overlayState_;
@@ -176,6 +178,7 @@ class Renderer {
     std::array<ImFont *, FontPresets.size()> fonts_{};
     MenuMotion menuMotion_;
     SteamProfile steamProfile_;
+    bool steamMenuVisible_{};
     WeaponAtlas weapons_;
     ModelPreview modelPreview_;
     SceneGrade sceneGrade_;
@@ -258,6 +261,7 @@ class Renderer {
     }
 
   public:
+    explicit Renderer(DeferredLog &log) : log_(log) {}
     ~Renderer() { DestroyImGui(); }
     bool WantsPreview() const noexcept { return previewVisible_; }
     void Diagnostics(PanelInformation &info) const noexcept {
@@ -290,7 +294,7 @@ class Renderer {
         if (FAILED(hr = weapons_.Initialize(device.Get())))
             return hr;
         if (FAILED(modelPreview_.Initialize(device.Get())))
-            OverlayLog("Could not initialize the character preview");
+            log_.Push("Could not initialize the character preview");
         return CreateImGui(config);
     }
     HRESULT Render(IDXGISwapChain *chain, const FrameSnapshot &frame, Configuration &c, VisualOptions &visual,
@@ -360,7 +364,7 @@ class Renderer {
                           sceneDepth != nullptr, static_cast<unsigned>(depthStart_), static_cast<unsigned>(depthResult),
                           capturedDepth.eligibleBindings, capturedDepth.depthClears, capturedDepth.qualifiedDraws,
                           capturedDepth.copies, reversedDepth, desc.Width, desc.Height);
-            OverlayLog(depthLog);
+            log_.Push(depthLog);
         }
         ImGuiScope imgui(imgui_);
         RefreshFonts(c, visual);
@@ -374,6 +378,10 @@ class Renderer {
         io.DeltaTime = std::clamp(std::chrono::duration<float>(now - previousTime_).count(), .001f, .1f);
         previousTime_ = now;
         const float menuAlpha = menuMotion_.Update(bridge.Visible(), io.DeltaTime, visual.menuAnimations != 0);
+        const bool menuOpen = bridge.Visible();
+        if (menuOpen && !steamMenuVisible_)
+            steamProfile_.RequestRefresh();
+        steamMenuVisible_ = menuOpen;
         if ((c.enabled && visual.sessionBadge) || bridge.Visible() ||
             (visual.spectators && info.spectators && info.spectators->count))
             steamProfile_.Update(device_.Get());
@@ -649,7 +657,8 @@ struct Runtime {
     ComPtr<ID3D11DepthStencilView> effectDepth;
     bool effectReversed{};
     bool settingsDirty{};
-    ULONGLONG saveAt{};
+    ULONGLONG saveAt{}, nextSlowFrameLog{};
+    cosmetics::FrameFreshness loadoutFreshness;
     profiles::WorkingFile profileIO;
     profiles::Browser profileBrowser;
     profiles::View profileView;
@@ -797,6 +806,14 @@ struct Runtime {
         else
             profileView.message = "Could not start the profile operation. Your settings were kept.";
     }
+    void ConfigureLoadout(const Configuration &c, const VisualOptions &v, bool fresh, bool allowed = true) {
+        if (!useCs2)
+            return;
+        auto options = v.cosmetics;
+        if (!loadoutFreshness.Allow(allowed && c.enabled && options.enabled, fresh, GetTickCount64()))
+            options.enabled = 0;
+        cosmetics::Configure(options);
+    }
     void SaveProfile(bool force = false) {
         profiles::WorkingFile::Job job;
         {
@@ -917,7 +934,7 @@ struct Runtime {
         HRESULT hr = swapChain->GetDesc(&desc);
         if (FAILED(hr) || !IsWindow(desc.OutputWindow))
             return E_INVALIDARG;
-        auto next = std::make_unique<Renderer>();
+        auto next = std::make_unique<Renderer>(diagnosticLog);
         Configuration c;
         {
             std::scoped_lock lock(dataMutex);
@@ -938,7 +955,7 @@ struct Runtime {
         renderer = std::move(next);
         chain = swapChain;
         bound.store(swapChain, std::memory_order_release);
-        OverlayLog("DirectX 11 Present captured. Insert opens the menu; Home toggles drawing.");
+        diagnosticLog.Push("DirectX 11 Present captured. Insert opens the menu; Home toggles drawing.");
         return S_OK;
     }
     HRESULT RenderFrame(UINT flags) {
@@ -1013,7 +1030,7 @@ struct Runtime {
             cs2::ConfigureViewmodel({}, false);
             cs2::ConfigureWeather({}, false);
             cs2::ConfigureScoreboard({}, false);
-            cosmetics::Configure({});
+            ConfigureLoadout(c, visual, false, false);
             native_mask::Discard();
             ghosts.Clear();
             if (useCs2) {
@@ -1045,7 +1062,7 @@ struct Runtime {
             info.bonePositions = status.reads.bonePositions;
             info.failedBoneReads = status.reads.failedBoneReads;
             if (std::strcmp(previousStatus, status.message) != 0) {
-                OverlayLog(status.message);
+                diagnosticLog.Push(status.message);
                 std::memcpy(previousStatus, status.message, sizeof(previousStatus));
             }
         } else {
@@ -1064,7 +1081,9 @@ struct Runtime {
                                           ? cosmetics::CatalogRuntime().Snapshot()
                                           : nullptr;
         info.cosmeticsCatalog = cosmeticsCatalog.get();
-        info.cosmeticsStatus = cosmetics::Name(cosmetics::Status().state);
+        const auto loadoutStatus = cosmetics::Status();
+        info.cosmeticsStatus = cosmetics::Name(loadoutStatus.state);
+        info.cosmeticsRefreshes = loadoutStatus.materialRefreshes;
         info.weatherStatus = weather::Label(cs2::ReadWeatherDiagnostics().status);
         info.scoreboardReady = cs2::GetScoreboardStatus().connected;
         info.nativeFramesReady = cs2::frame::Diagnostics().connected;
@@ -1192,7 +1211,7 @@ struct Runtime {
                           "fire=%u events=%llu.",
                           fresh, world.discovered, world.fireEntities, world.burningCells, world.fireReadFailures,
                           info.areaCount, visual.combat.areas, visual.combat.fireArea, flightData.infernoEvents);
-            OverlayLog(message);
+            diagnosticLog.Push(message);
         }
         info.skyCount = source.SkyCount();
         info.skyFailed = source.SkyFailures();
@@ -1239,7 +1258,7 @@ struct Runtime {
             cs2::ConfigureViewmodel({}, false);
             cs2::ConfigureWeather({}, false);
             cs2::ConfigureScoreboard({}, false);
-            cosmetics::Configure({});
+            ConfigureLoadout(c, visual, fresh, !IsIconic(window));
             native_mask::Discard();
             ghosts.Clear();
             if (useCs2) {
@@ -1307,10 +1326,7 @@ struct Runtime {
             const bool nativeFresh = fresh && c.enabled && SUCCEEDED(hr) && !actions.rescan;
             cs2::ConfigureWeather(visual.weather, nativeFresh);
             cs2::ConfigureScoreboard(visual.scoreboard, nativeFresh);
-            auto loadout = visual.cosmetics;
-            if (!nativeFresh)
-                loadout.enabled = 0;
-            cosmetics::Configure(loadout);
+            ConfigureLoadout(c, visual, fresh, SUCCEEDED(hr) && !actions.rescan);
         }
         if (actions.browseSound)
             sounds.Browse();
@@ -1388,6 +1404,17 @@ struct Runtime {
         RunTracking(f, flightData, fresh && SUCCEEDED(hr) && !actions.rescan, seconds, frameNumber);
 
         totalMs = std::chrono::duration<float, std::milli>(std::chrono::steady_clock::now() - frameStart).count();
+        // A queued timing report distinguishes slow overlay work from a long gap
+        // spent in the host. Neither reporting nor a blocked log sink delays Present.
+        const auto logTime = GetTickCount64();
+        if (useCs2 && fresh && (totalMs >= 50.f || seconds >= .25f) && logTime >= nextSlowFrameLog) {
+            nextSlowFrameLog = logTime + 1000;
+            char message[256]{};
+            std::snprintf(message, sizeof(message),
+                          "Frame timing: gap=%.1fms overlay=%.1fms read=%.1fms render=%.1fms skinRefreshes=%u.",
+                          seconds * 1000.f, totalMs, readMs, renderMs, info.cosmeticsRefreshes);
+            diagnosticLog.Push(message);
+        }
         return hr;
     }
 };
@@ -1400,9 +1427,9 @@ HRESULT STDMETHODCALLTYPE PresentHook(IDXGISwapChain *chain, UINT interval, UINT
         if (SUCCEEDED(chain->GetDesc(&desc)) && desc.OutputWindow == r->targetWindow && !r->binding.exchange(true)) {
             try {
                 if (FAILED(r->Bind(chain)))
-                    OverlayLog("The game swap chain could not initialize the GUI renderer.");
+                    r->diagnosticLog.Push("The game swap chain could not initialize the GUI renderer.");
             } catch (...) {
-                OverlayLog("The GUI renderer could not initialize.");
+                r->diagnosticLog.Push("The GUI renderer could not initialize.");
             }
             r->binding = false;
         }

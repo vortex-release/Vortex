@@ -440,12 +440,16 @@ HRESULT Start(ID3D11Device *device, ID3D11DeviceContext *context, UINT width, UI
             if (!state.hooked[i]) {
                 if (MH_CreateHook(state.addresses[i], hooks[i], originals[i]) != MH_OK)
                     return rollback();
-                if (MH_EnableHook(state.addresses[i]) != MH_OK) {
-                    MH_RemoveHook(state.addresses[i]);
-                    return rollback();
-                }
+                // Track creation before activation so rollback also owns disabled
+                // hooks. MinHook freezes all process threads for each ApplyQueued;
+                // enabling fourteen hooks separately produced fourteen global pauses.
                 state.hooked[i] = true;
             }
+        for (std::size_t i = 0; i < state.hooked.size(); ++i)
+            if (state.hooked[i] && MH_QueueEnableHook(state.addresses[i]) != MH_OK)
+                return rollback();
+        if (MH_ApplyQueued() != MH_OK)
+            return rollback();
         state.ready = true;
         return S_OK;
     } catch (...) {
@@ -515,12 +519,15 @@ HRESULT Stop() noexcept {
         state.ready = false;
         state.witnessEligible = false;
     }
+    bool queued{};
     for (std::size_t i = 0; i < state.hooked.size(); ++i)
         if (state.hooked[i]) {
-            auto r = MH_DisableHook(state.addresses[i]);
-            if (r != MH_OK && r != MH_ERROR_DISABLED)
+            if (MH_QueueDisableHook(state.addresses[i]) != MH_OK)
                 return E_FAIL;
+            queued = true;
         }
+    if (queued && MH_ApplyQueued() != MH_OK)
+        return E_FAIL;
     const auto deadline = GetTickCount64() + 5000;
     while (state.inFlight) {
         if (GetTickCount64() > deadline)

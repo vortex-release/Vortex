@@ -28,7 +28,8 @@ class SteamAvatarCache {
         std::uint64_t id{};
         ULONGLONG used{}, nextPoll{};
         int image{};
-        bool requested{};
+        bool requested{}, resolved{};
+        unsigned attempts{};
         Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> view;
     };
     std::array<Entry, 64> entries_;
@@ -38,6 +39,7 @@ class SteamAvatarCache {
   public:
     ID3D11ShaderResourceView *Get(const SteamProfileApi &, ID3D11Device *, std::uint64_t, ULONGLONG) noexcept;
     void Clear() noexcept;
+    void RequestRefresh() noexcept;
 };
 class SteamProfile {
     HMODULE module_{};
@@ -45,6 +47,9 @@ class SteamProfile {
     ULONGLONG nextPoll_{};
     std::uint64_t id_{};
     int image_{};
+    unsigned attempts_{};
+    bool settled_{};
+    ID3D11Device *device_{};
     std::string name_{"Steam user"};
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> avatar_;
     SteamAvatarCache avatars_;
@@ -53,6 +58,8 @@ class SteamProfile {
   public:
     ~SteamProfile();
     void Update(ID3D11Device *, ULONGLONG now = GetTickCount64()) noexcept;
+    // Refresh is explicit; cached avatars never make periodic Steam IPC calls.
+    void RequestRefresh() noexcept;
     const char *Name() const noexcept { return name_.c_str(); }
     ID3D11ShaderResourceView *Avatar() const noexcept { return avatar_.Get(); }
     ID3D11ShaderResourceView *AvatarFor(ID3D11Device *device, std::uint64_t id, ULONGLONG now) noexcept {

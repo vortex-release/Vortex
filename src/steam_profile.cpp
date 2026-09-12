@@ -78,9 +78,17 @@ void SteamAvatarCache::Clear() noexcept {
     nextWork_ = 0;
     device_ = nullptr;
 }
+void SteamAvatarCache::RequestRefresh() noexcept {
+    nextWork_ = 0;
+    for (auto &entry : entries_) {
+        entry.nextPoll = 0;
+        entry.attempts = 0;
+        entry.resolved = entry.requested = false;
+    }
+}
 ID3D11ShaderResourceView *SteamAvatarCache::Get(const SteamProfileApi &api, ID3D11Device *device, std::uint64_t id,
                                                 ULONGLONG now) noexcept {
-    if (!api || !device || !id)
+    if (!device || !id)
         return nullptr;
     if (device_ != device) {
         Clear();
@@ -99,22 +107,34 @@ ID3D11ShaderResourceView *SteamAvatarCache::Get(const SteamProfileApi &api, ID3D
         entry->id = id;
     }
     entry->used = now;
-    // At most one avatar read/upload per 100 ms, independent of frame rate.
-    if (now >= nextWork_ && now >= entry->nextPoll) {
+    // Resolved images are immutable until explicit refresh. Pending images have
+    // four bounded attempts, so missing avatars cannot cause recurring Steam IPC.
+    if (api && !entry->resolved && entry->attempts < 4 && now >= nextWork_ && now >= entry->nextPoll) {
+        ++entry->attempts;
         nextWork_ = now + 100;
         entry->nextPoll = now + 5000;
         SteamProfileSample sample;
         const bool success = OtherAvatar(&api, id, !entry->requested, &sample);
-        entry->requested = true;
+        entry->requested = success;
         if (success && sample.avatar == 0) {
             entry->image = 0;
             entry->view.Reset();
-        } else if (success && sample.avatar > 0 && sample.avatar != entry->image) {
-            ImagePixels pixels;
-            if (ReadSteamAvatar(api, sample, pixels) && SUCCEEDED(UploadImage(device, pixels, entry->view)))
-                entry->image = sample.avatar;
-        } else if (!success || sample.avatar < 0)
-            entry->nextPoll = now + 1000;
+            entry->resolved = true;
+        } else if (success && sample.avatar > 0) {
+            if (sample.avatar == entry->image && entry->view) {
+                entry->resolved = true;
+            } else {
+                ImagePixels pixels;
+                Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> next;
+                if (ReadSteamAvatar(api, sample, pixels) && SUCCEEDED(UploadImage(device, pixels, next))) {
+                    entry->view = std::move(next);
+                    entry->image = sample.avatar;
+                    entry->resolved = true;
+                }
+            }
+        }
+        if (!entry->resolved)
+            entry->nextPoll = now + (1000ull << (entry->attempts - 1));
     }
     return entry->view.Get();
 }
@@ -149,34 +169,56 @@ SteamProfile::~SteamProfile() {
     if (module_)
         FreeLibrary(module_);
 }
+void SteamProfile::RequestRefresh() noexcept {
+    nextPoll_ = 0;
+    attempts_ = 0;
+    settled_ = false;
+    avatars_.RequestRefresh();
+}
 void SteamProfile::Update(ID3D11Device *device, ULONGLONG now) noexcept {
-    if (now < nextPoll_)
+    if (!device)
         return;
-    nextPoll_ = now + 2000;
+    if (device_ != device) {
+        device_ = device;
+        avatar_.Reset();
+        image_ = 0;
+        avatars_.Clear();
+        RequestRefresh();
+    }
+    if (settled_ || attempts_ >= 4 || now < nextPoll_)
+        return;
+    nextPoll_ = now + (2000ull << attempts_++);
     try {
         SteamProfileSample sample;
         if (!Connect() || !ReadSteamProfile(api_, sample)) {
-            id_ = 0;
-            image_ = 0;
-            name_ = "Steam user";
-            avatar_.Reset();
+            // A failed explicit refresh must not discard a previously valid
+            // persona/texture. The next bounded attempt can reconnect the API.
             api_ = {};
-            avatars_.Clear();
             return;
         }
         if (sample.id != id_) {
             avatar_.Reset();
             image_ = 0;
+            avatars_.Clear();
         }
         id_ = sample.id;
         name_ = sample.name[0] ? sample.name : "Steam user";
         if (sample.avatar == 0) {
             avatar_.Reset();
             image_ = 0;
-        } else if (sample.avatar > 0 && sample.avatar != image_) {
-            ImagePixels pixels;
-            if (ReadSteamAvatar(api_, sample, pixels) && SUCCEEDED(UploadImage(device, pixels, avatar_)))
-                image_ = sample.avatar;
+            settled_ = true;
+        } else if (sample.avatar > 0) {
+            if (sample.avatar == image_ && avatar_) {
+                settled_ = true;
+            } else {
+                ImagePixels pixels;
+                Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> next;
+                if (ReadSteamAvatar(api_, sample, pixels) && SUCCEEDED(UploadImage(device, pixels, next))) {
+                    avatar_ = std::move(next);
+                    image_ = sample.avatar;
+                    settled_ = true;
+                }
+            }
         }
     } catch (...) {
     }

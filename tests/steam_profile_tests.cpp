@@ -22,6 +22,12 @@ int main() {
     if (!module)
         return 2;
     const auto calls = reinterpret_cast<int (*)()>(GetProcAddress(module, "FixtureAvatarReads"));
+    const auto queries = reinterpret_cast<int (*)()>(GetProcAddress(module, "FixtureAvatarQueries"));
+    const auto personas = reinterpret_cast<int (*)()>(GetProcAddress(module, "FixturePersonaQueries"));
+    const auto setAvatar = reinterpret_cast<void (*)(int)>(GetProcAddress(module, "FixtureSetAvatarResult"));
+    const auto setPersona = reinterpret_cast<void (*)(bool)>(GetProcAddress(module, "FixtureSetPersonaAvailable"));
+    if (!calls || !queries || !personas || !setAvatar || !setPersona)
+        return 4;
     Microsoft::WRL::ComPtr<ID3D11Device> device;
     Microsoft::WRL::ComPtr<ID3D11DeviceContext> context;
     if (FAILED(D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_WARP, nullptr, 0, nullptr, 0, D3D11_SDK_VERSION, &device,
@@ -34,6 +40,7 @@ int main() {
         check(profile.Avatar() != nullptr && calls && calls() == 1, "avatar uploaded once");
         profile.Update(device.Get(), 4000);
         check(calls && calls() == 1, "repeated polls reuse the cached image handle");
+        check(queries() == 1 && personas() == 1, "settled profile avoids persona and avatar IPC after two seconds");
         auto *other = profile.AvatarFor(device.Get(), 2, 4100);
         check(other != nullptr && calls() == 2, "spectator avatar is uploaded");
         check(profile.AvatarFor(device.Get(), 2, 4200) == other && calls() == 2, "spectator avatar is reused");
@@ -41,6 +48,22 @@ int main() {
         check(profile.AvatarFor(device.Get(), 3, 4250) != nullptr && calls() == 3,
               "queued spectator resolves on later frame");
         check(!profile.AvatarFor(device.Get(), 0, 4300), "missing Steam ID never reuses somebody else's avatar");
+        const auto cachedQueries = queries(), cachedPersonas = personas();
+        auto *selfAvatar = profile.Avatar();
+        for (ULONGLONG time : {10000ull, 100000ull, 1000000ull}) {
+            profile.Update(device.Get(), time);
+            check(profile.AvatarFor(device.Get(), 2, time) == other,
+                  "settled spectator texture survives large elapsed time");
+        }
+        check(queries() == cachedQueries && personas() == cachedPersonas,
+              "resolved profile and spectator make no recurring two/five-second IPC calls");
+        profile.RequestRefresh();
+        profile.Update(device.Get(), 2000000);
+        check(queries() == cachedQueries + 1 && personas() == cachedPersonas + 1 && calls() == 3 &&
+                  profile.Avatar() == selfAvatar,
+              "explicit refresh queries once and preserves unchanged GPU image");
+        check(profile.AvatarFor(device.Get(), 2, 2000100) == other && queries() == cachedQueries + 2 && calls() == 3,
+              "explicit spectator refresh reuses unchanged texture");
         Microsoft::WRL::ComPtr<ID3D11Resource> resource;
         if (profile.Avatar())
             profile.Avatar()->GetResource(&resource);
@@ -156,6 +179,38 @@ int main() {
         ImGui::EndFrame();
         ImGui_ImplDX11_Shutdown();
         ImGui::DestroyContext();
+        const auto beforePending = queries();
+        setAvatar(-1);
+        profile.RequestRefresh();
+        for (ULONGLONG time : {3000000ull, 3010000ull, 3020000ull, 3040000ull, 3100000ull, 4000000ull})
+            profile.Update(device.Get(), time);
+        check(queries() == beforePending + 4 && profile.Avatar() == selfAvatar,
+              "unresolved local avatar has four attempts and preserves the previous texture");
+        profile.RequestRefresh();
+        profile.Update(device.Get(), 5000000);
+        check(queries() == beforePending + 5, "explicit refresh resets exhausted local retry budget");
+        setAvatar(4);
+        profile.RequestRefresh();
+        profile.Update(device.Get(), 5000100);
+        check(profile.Avatar() == selfAvatar, "resolved local avatar retains its original texture");
+        const auto beforeFailure = personas();
+        setPersona(false);
+        profile.RequestRefresh();
+        profile.Update(device.Get(), 5000200);
+        check(personas() == beforeFailure + 1 && profile.Avatar() == selfAvatar &&
+                  std::string(profile.Name()) == "Observer Demo",
+              "failed explicit persona refresh retains valid display data");
+        check(profile.AvatarFor(device.Get(), 2, 5000300) == other,
+              "failed Steam reconnect does not hide a previously cached spectator image");
+        setPersona(true);
+        setAvatar(0);
+        profile.RequestRefresh();
+        profile.Update(device.Get(), 6000000);
+        const auto afterAbsent = queries();
+        profile.Update(device.Get(), 7000000);
+        check(!profile.Avatar() && queries() == afterAbsent,
+              "confirmed absence clears local image once without recurring IPC");
+        setAvatar(4);
     }
     FreeLibrary(module);
     SteamProfileSample sample;
@@ -177,6 +232,29 @@ int main() {
     sample.width = sample.height = 32;
     check(!ReadSteamAvatar(mock, sample, pixels) && pixels.rgba.empty(),
           "failed avatar decode does not publish pixels");
+    struct PendingAvatar {
+        unsigned queries{};
+        int image{-1};
+    } pending;
+    auto pendingApi = mock;
+    pendingApi.friends = &pending;
+    pendingApi.avatar = [](void *ctx, std::uint64_t) {
+        auto &p = *static_cast<PendingAvatar *>(ctx);
+        ++p.queries;
+        return p.image;
+    };
+    SteamAvatarCache pendingCache;
+    for (ULONGLONG time : {1000ull, 10000ull, 20000ull, 30000ull, 1000000ull})
+        check(!pendingCache.Get(pendingApi, device.Get(), 99, time), "pending spectator uses placeholder");
+    check(pending.queries == 4, "unresolved spectator stops IPC after four attempts");
+    pendingCache.RequestRefresh();
+    pendingCache.Get(pendingApi, device.Get(), 99, 2000000);
+    check(pending.queries == 5, "explicit refresh resets exhausted spectator retry budget");
+    pending.image = 0;
+    pendingCache.RequestRefresh();
+    pendingCache.Get(pendingApi, device.Get(), 99, 3000000);
+    pendingCache.Get(pendingApi, device.Get(), 99, 4000000);
+    check(pending.queries == 6, "known-absent spectator is cached without repeated IPC");
     std::printf("Steam profile checks: %u failures\n", failures);
     return failures ? 1 : 0;
 }

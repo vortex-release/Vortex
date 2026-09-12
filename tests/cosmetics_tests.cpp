@@ -29,6 +29,30 @@ struct Memory {
         return true;
     }
 };
+struct AttributeMemory {
+    awareness::cosmetics::PaintAttributes values{};
+    unsigned writes{}, failSlot{99}, ignoreSlot{99};
+    bool partialFailure{}, newerValue{};
+    static bool Read(void *context, awareness::cosmetics::PaintAttributes &out) noexcept {
+        out = static_cast<AttributeMemory *>(context)->values;
+        return true;
+    }
+    static bool Write(void *context, unsigned slot, awareness::cosmetics::AttributeState value) noexcept {
+        auto &m = *static_cast<AttributeMemory *>(context);
+        ++m.writes;
+        if (slot == m.failSlot) {
+            m.failSlot = 99;
+            if (m.partialFailure)
+                m.values[slot] = value;
+            if (m.newerValue)
+                m.values[0] = {true, 999.f};
+            return false;
+        }
+        if (slot != m.ignoreSlot)
+            m.values[slot] = value;
+        return true;
+    }
+};
 constexpr std::string_view Items = R"KV(
 "items_game" {
  "seasonaloperations" { "quest_reward" { "[0]" { "item_name" "test" } "[*]" { "none" "none" } } }
@@ -142,6 +166,117 @@ int main(int argc, char **argv) {
     PatchSet same;
     same.Add(4, a, a);
     Check(same.count == 0 && same.Commit(&m, Memory::Write), "unchanged fields require no write");
+    const auto requestedAttributes = DesiredAttributes(finish);
+    AttributeMemory attributes;
+    const auto absent = attributes.values;
+    Check(CommitAttributes(&attributes, absent, requestedAttributes, AttributeMemory::Read, AttributeMemory::Write) &&
+              attributes.values == requestedAttributes &&
+              attributes.values[0].value == static_cast<float>(finish.paintKit),
+          "weapon finish populates actual item-view paint seed wear attributes");
+    attributes.writes = 0;
+    Check(CommitAttributes(&attributes, requestedAttributes, requestedAttributes, AttributeMemory::Read,
+                           AttributeMemory::Write) &&
+              !attributes.writes,
+          "unchanged attributes avoid engine setter calls");
+    Check(RestoreAttributes(&attributes, absent, requestedAttributes, AttributeMemory::Read, AttributeMemory::Write) &&
+              attributes.values == absent,
+          "restore removes originally absent finish attributes");
+    attributes.values = {{{true, 12.f}, {true, 19.f}, {true, .3f}}};
+    const auto originalAttributes = attributes.values;
+    attributes.failSlot = 2;
+    attributes.partialFailure = true;
+    Check(!CommitAttributes(&attributes, originalAttributes, requestedAttributes, AttributeMemory::Read,
+                            AttributeMemory::Write) &&
+              attributes.values == originalAttributes,
+          "partial native attribute failure restores all completed changes");
+    attributes.failSlot = 1;
+    attributes.newerValue = true;
+    Check(!CommitAttributes(&attributes, originalAttributes, requestedAttributes, AttributeMemory::Read,
+                            AttributeMemory::Write) &&
+              attributes.values[0].value == 999.f && attributes.values[1] == originalAttributes[1],
+          "attribute rollback preserves newer server values");
+    attributes = {};
+    attributes.ignoreSlot = 1;
+    Check(!CommitAttributes(&attributes, absent, requestedAttributes, AttributeMemory::Read, AttributeMemory::Write) &&
+              attributes.values == absent,
+          "silent engine setter failure detected by readback before material refresh");
+    ModelPath originalModel{}, replacementModel{}, serverModel{};
+    std::memcpy(originalModel.data(), "models/original.vmdl", 21);
+    std::memcpy(replacementModel.data(), "models/replacement.vmdl", 24);
+    std::memcpy(serverModel.data(), "models/server.vmdl", 19);
+    ModelRequest modelRequest;
+    auto confirmedModel = originalModel;
+    modelRequest.Begin(originalModel, replacementModel);
+    bool stillPending = true;
+    for (unsigned poll = 0; poll < 40; ++poll)
+        stillPending &= modelRequest.Observe(originalModel) == ModelObservation::Pending && modelRequest.active;
+    Check(stillPending && confirmedModel == originalModel,
+          "delayed apply retains original confirmed model and a single active request");
+    // Disabling during that load must wait for the issued replacement before requesting restore.
+    Check(modelRequest.Observe(originalModel) == ModelObservation::Pending,
+          "disable during pending apply cannot clear model ownership early");
+    Check(modelRequest.Observe(replacementModel) == ModelObservation::Confirmed && !modelRequest.active,
+          "replacement becomes owned only when resident readback confirms it");
+    confirmedModel = modelRequest.target;
+    modelRequest.Begin(confirmedModel, originalModel);
+    Check(confirmedModel == replacementModel && modelRequest.target == originalModel,
+          "restore target stays separate from last confirmed replacement");
+    stillPending = true;
+    for (unsigned poll = 0; poll < 40; ++poll)
+        stillPending &= modelRequest.Observe(replacementModel) == ModelObservation::Pending && modelRequest.active;
+    Check(stillPending && confirmedModel == replacementModel,
+          "slow restoration cannot mistake the previous replacement for an external change");
+    Check(modelRequest.Observe(originalModel) == ModelObservation::Confirmed && !modelRequest.active,
+          "restoration completes only after original model readback");
+    confirmedModel = modelRequest.target;
+    Check(confirmedModel == originalModel && modelRequest.Observe(originalModel) == ModelObservation::None,
+          "completed model transition requires no extra request");
+    modelRequest.Begin(originalModel, replacementModel);
+    Check(modelRequest.Observe(serverModel) == ModelObservation::Superseded && !modelRequest.active,
+          "distinct server model supersedes adapter ownership");
+    FrameFreshness frames;
+    Check(!frames.Allow(true, false, 0), "cosmetics wait for first fresh overlay frame");
+    Check(frames.Allow(true, true, 100) && frames.Allow(true, false, 1100),
+          "one-second snapshot stall does not restore and rebuild the loadout");
+    Check(!frames.Allow(true, false, 2101), "sustained snapshot loss expires loadout grace");
+    Check(frames.Allow(true, true, 2200) && !frames.Allow(false, false, 2201) && !frames.Allow(true, false, 2202),
+          "explicit disable clears grace immediately and requires new freshness");
+    Check(frames.Allow(true, true, 3000) && !frames.Allow(true, false, 2000),
+          "clock rollback cannot preserve a stale grace period");
+    MaterialRequest request;
+    Check(request.Select(desired) && request.Ready(0), "new selection schedules initial material refresh");
+    // A resource can remain pending for many seconds without consuming a native refresh attempt.
+    for (unsigned frame = 0; frame < 1000; ++frame) {
+        request.Select(desired);
+        request.Ready(frame * 16);
+    }
+    Check(!request.attempts && request.Ready(16000), "delayed resources do not exhaust refresh attempts");
+    request.Attempt(16000);
+    request.Complete();
+    auto drift = desired;
+    drift.restoreMaterial = 0;
+    drift.initialized = 0;
+    drift.disallow = 0;
+    drift.itemId = original.itemId;
+    drift.high = original.high;
+    drift.low = original.low;
+    drift.account = original.account;
+    bool unchanged = true;
+    for (unsigned frame = 0; frame < 1000; ++frame)
+        unchanged &= !request.Select(drift) && !request.Ready(16016 + frame * 16);
+    Check(unchanged && request.attempts == 1,
+          "stable appearance and engine identity flag drift never rebuild materials continuously");
+    auto changedFinish = desired;
+    changedFinish.wear += .01f;
+    Check(request.Select(changedFinish) && request.Ready(32000) && request.attempts == 0,
+          "wear change schedules a fresh material request");
+    request.Attempt(32000);
+    Check(!request.Ready(32249) && request.Ready(32250), "failed refresh retry cadence bounded");
+    request.Attempt(32250);
+    request.Attempt(32500);
+    Check(!request.Ready(50000), "repeated native refresh failures stop after three attempts");
+    changedFinish.seed++;
+    Check(request.Select(changedFinish) && request.Ready(50000), "editing finish recovers exhausted request");
     Catalog catalog;
     std::string error;
     Check(ParseCatalog(Items, R"("lang" { "Tokens" { "AK" "AK-47" "FINISH" "Sample Finish" } })", catalog, error),

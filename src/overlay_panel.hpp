@@ -66,7 +66,7 @@ struct PanelInformation {
     const char *cosmeticsStatus{"Available in game"};
     const char *weatherStatus{"Off"};
     bool scoreboardReady{}, nativeFramesReady{};
-    std::uint32_t nativeFrameFailures{};
+    std::uint32_t nativeFrameFailures{}, cosmeticsRefreshes{};
 };
 struct PanelActions {
     awareness::profiles::Request profile;
@@ -789,6 +789,7 @@ inline bool DrawFeatureSection(int section, awareness::Configuration &c, awarene
                 const auto &models = info.modelDiagnostics;
                 ImGui::Text("Native frame dispatcher: %s   Fault mask %u",
                             info.nativeFramesReady ? "connected" : "unavailable", info.nativeFrameFailures);
+                ImGui::Text("Loadout: %s   Material refreshes %u", info.cosmeticsStatus, info.cosmeticsRefreshes);
                 ImGui::Text("Hidden model bridge: %s   Queued %u   Matched %u",
                             models.hiddenBridgeReady ? "ready" : "unavailable", models.hiddenQueued,
                             models.hiddenMatched);

@@ -513,16 +513,6 @@ bool UpdateModelFill(const FrameSnapshot &, const Configuration &config, const E
         PauseModelFill();
         return false;
     }
-    // Shader resources can finish asynchronously after material creation. Poll
-    // only unresolved handles, at most once a second; never recreate a material
-    // from Present or a render worker.
-    const auto now = GetTickCount64();
-    if (now >= state.materialPoll) {
-        state.materialPoll = now + 1000;
-        for (auto &material : state.materials)
-            if (material.object && !material.forwardVariant.load(std::memory_order_acquire))
-                material.forwardVariant.store(ResolveForwardVariant(material.object), std::memory_order_release);
-    }
     // Entity/scene enumeration is done by the snapshot worker. This function only
     // publishes an immutable selection for draw callbacks.
     if (!cached) {
@@ -536,6 +526,18 @@ bool UpdateModelFill(const FrameSnapshot &, const Configuration &config, const E
         output.status = EffectsStatus::Failed;
         output.result = E_INVALIDARG;
         return false;
+    }
+    // Shader resources can finish asynchronously after material creation. Poll
+    // only unresolved handles, at most once a second; never recreate a material
+    // from Present or a render worker.
+    const auto now = GetTickCount64();
+    if (targets.count && model::HasVisibleTint(effects) && now >= state.materialPoll) {
+        state.materialPoll = now + 1000;
+        for (unsigned i = 0; i < (shaded ? 2u : 1u); ++i) {
+            auto &material = state.materials[i];
+            if (material.object && !material.forwardVariant.load(std::memory_order_acquire))
+                material.forwardVariant.store(ResolveForwardVariant(material.object), std::memory_order_release);
+        }
     }
     const auto draws = state.draws.exchange(0);
     output = {};

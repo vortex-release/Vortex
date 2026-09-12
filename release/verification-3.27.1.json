@@ -1,0 +1,37 @@
+{
+  "version": "3.27.1",
+  "phase": "Local integrated preflight before release packaging",
+  "verifiedAtUtc": "2026-09-12T03:46:07.918794+00:00",
+  "build": "Release x64",
+  "offlineTests": {
+    "passed": 54,
+    "failed": 0,
+    "total": 54
+  },
+  "focusedChecks": {
+    "cosmeticsWithInstalledCatalog": 73,
+    "nativeModelMask": 42,
+    "installedNativeEntrySignatures": 9
+  },
+  "liveGameplayVerified": false,
+  "gameLaunched": false,
+  "gameInspected": false,
+  "activeSettingsPreserved": true,
+  "activeSettingsSha256": "A67CE5B3F513338E35F1BC5B9F1C46C178C4EACF8377DC76AFAB66333442C50C",
+  "dllSha256": "7E19325C026B37D0401B1275434E8CCAE027647DEAA2CF33A74809675030EAC9",
+  "nativeBuild": 14181,
+  "integrationNotes": "docs/hotfix-3.27.1.md",
+  "evidence": [
+    "docs/cosmetics-native.md",
+    "tests/steam_profile_tests.cpp",
+    "tests/deferred_log_tests.cpp",
+    "tests/native_model_mask_tests.cpp"
+  ],
+  "releaseWorkflow": ".github/workflows/release.yml",
+  "packagingVerification": "release.ps1 repeats build/tests, validates installer/feed/checksums, and only then publishes a tag",
+  "limitations": [
+    "Offline validation only; live frame-time improvement and finish appearance are not claimed",
+    "Initial Steam queries and explicit menu-open refresh remain synchronous; resolved entries no longer poll periodically",
+    "First-use model loading and rendering effects still have a cost"
+  ]
+}

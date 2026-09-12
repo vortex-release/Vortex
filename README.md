@@ -4,7 +4,7 @@ Native Windows x64 launcher and Direct3D 11 overlay with configurable profiles, 
 
 Download **VortexSetup.exe** from [the latest release](https://github.com/vortex-release/Vortex/releases/latest). Install once; later releases appear on the Updates page. No GitHub account is required to download or update.
 
-The current integration and native feature limits are documented in [the 3.27 integration notes](docs/integration-3.27.md).
+The current integration and native feature limits are documented in [the 3.27 integration notes](docs/integration-3.27.md). The periodic-stall and finish corrections are covered in [the 3.27.1 hotfix notes](docs/hotfix-3.27.1.md).
 
 ## Build and release
 
