@@ -1,0 +1,37 @@
+{
+  "version": "3.27.3",
+  "phase": "Local integrated preflight before release packaging",
+  "verifiedAtUtc": "2026-09-12T04:51:41.9298474Z",
+  "build": "Release x64",
+  "offlineTests": {
+    "passed": 54,
+    "failed": 0,
+    "total": 54
+  },
+  "focusedAssistChecks": 623,
+  "failingRegressionAssertionsBeforeFix": 5,
+  "liveGameplayVerified": false,
+  "gameLaunched": false,
+  "gameInspected": false,
+  "activeSettingsPreserved": true,
+  "activeSettingsSha256": "A67CE5B3F513338E35F1BC5B9F1C46C178C4EACF8377DC76AFAB66333442C50C",
+  "dllSha256": "CFFDE4B431935DA4FA7FAA68821EE81D2D0C9AAD434AD2F8156578C68AC88F6E",
+  "nativeBuild": 14181,
+  "integrationNotes": "docs/movement-3.27.3.md",
+  "regressions": [
+    "W+A/D steering plateau",
+    "Initial physical jump cancellation",
+    "Stalled-tick repeat guard and safe physical Space handback",
+    "Failed owner-transition cleanup",
+    "Unwrapped yaw and truthful camera write outcomes",
+    "Recoil activity expiry and movement-only reads",
+    "Merged Movement tab controls, persistence and scrolling in offline DX11 fixture"
+  ],
+  "releaseWorkflow": ".github/workflows/release.yml",
+  "packagingVerification": "release.ps1 repeats build/tests, validates installer/feed/checksums, and only then publishes a tag",
+  "limitations": [
+    "Windows-input polling remains best effort, not a simulation command/subtick hook",
+    "One-millisecond poll wait is not a delivery or scheduling guarantee",
+    "No live jump timing, maximum velocity or performance result claimed"
+  ]
+}

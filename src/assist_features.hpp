@@ -120,7 +120,10 @@ inline StrafePlan OptimizeStrafe(const Sample &s, const Keys &keys, const Option
     float best = -1;
     for (float yaw : choices) {
         const float predicted = PredictedWishSpeed(s, yaw, wishAngle, o);
-        if (predicted > best + .0001f) {
+        // Equal-speed steps still make progress toward the selected optimum.
+        // With W+A/D the first several steps can have zero acceleration; refusing
+        // ties leaves the camera permanently stuck outside the useful wish angle.
+        if (predicted >= best) {
             best = predicted;
             out.yaw = yaw;
         }
@@ -135,6 +138,7 @@ inline StrafePlan OptimizeStrafe(const Sample &s, const Keys &keys, const Option
     out.predictedSpeed = best;
     return out;
 }
+enum class YawResult { Applied, Unchanged, Yielded, Failed };
 enum class Status : unsigned {
     Off,
     Paused,
@@ -158,7 +162,8 @@ enum class Status : unsigned {
     UnsupportedWeapon,
     DataUnavailable,
     Walking,
-    MouseDirection
+    MouseDirection,
+    Aligned
 };
 inline const char *Name(Status s) noexcept {
     switch (s) {
@@ -206,6 +211,8 @@ inline const char *Name(Status s) noexcept {
         return "Walking / manual steering";
     case Status::MouseDirection:
         return "Move mouse while holding jump";
+    case Status::Aligned:
+        return "Direction aligned";
     default:
         return "Input unavailable";
     }
@@ -223,13 +230,13 @@ class Controller {
     double targetSince_{}, nextShot_{}, mouseUntil_{}, jumpUntil_{}, lastTime_{};
     double strafeSince_{-1};
     double jumpReleasedAt_{-1}, mouseDirectionUntil_{}, pistolReleasedAt_{}, nextPistol_{}, pistolUntil_{};
-    std::uint32_t jumpReleaseTick_{}, pistolWeapon_{};
+    std::uint32_t jumpReleaseTick_{}, jumpPressTick_{}, pistolWeapon_{};
     std::int64_t mouseTravelX_{};
     std::uint64_t mouseSequence_{};
     int strafeSide_{}, mouseSide_{};
     unsigned ownedSide_{};
     bool mouseInitialized_{}, pistolEngaged_{}, pistolDown_{};
-    bool mouseDown_{}, jumpDown_{}, jumpEngaged_{}, toggleOn_{}, activationHeld_{};
+    bool mouseDown_{}, jumpDown_{}, jumpEngaged_{}, jumpInitialPress_{}, toggleOn_{}, activationHeld_{};
     std::array<bool, 2> suppressed_{};
     Diagnostics stats_;
     template <class B> bool Key(B &b, unsigned key, bool down) {
@@ -248,9 +255,21 @@ class Controller {
         if (mouseDown_ && (keys.Held(LeftMouse) || Mouse(b, false)))
             mouseDown_ = false;
     }
-    template <class B> void ReleaseJump(B &b) {
-        if (jumpDown_ && Key(b, Space, false))
-            jumpDown_ = false;
+    template <class B> void StopJump(B &b, const Keys &keys, bool allowRestore) {
+        if (jumpEngaged_ || jumpDown_) {
+            if (allowRestore && keys.Held(Space)) {
+                // Give a still-held physical key back without canceling its press.
+                if (!jumpDown_ && !jumpInitialPress_ && !b.RestoreJump()) {
+                    ++stats_.failures;
+                    return;
+                }
+            } else if (jumpDown_ && !Key(b, Space, false)) {
+                return;
+            }
+        }
+        jumpDown_ = jumpEngaged_ = jumpInitialPress_ = false;
+        jumpReleasedAt_ = -1;
+        jumpReleaseTick_ = jumpPressTick_ = 0;
     }
     template <class B> void RestoreForward(B &b, const Keys &keys, bool allow) {
         for (unsigned i = 0; i < 2; ++i)
@@ -293,12 +312,12 @@ class Controller {
         return (suppressed_[0] ? 1u : 0u) | (suppressed_[1] ? 2u : 0u) | (jumpEngaged_ ? 4u : 0u);
     }
     bool PendingRelease() const noexcept {
-        return mouseDown_ || jumpDown_ || ownedSide_ || pistolEngaged_ || pistolDown_ || suppressed_[0] ||
-               suppressed_[1];
+        return mouseDown_ || jumpDown_ || (jumpEngaged_ && !jumpInitialPress_) || ownedSide_ || pistolEngaged_ ||
+               pistolDown_ || suppressed_[0] || suppressed_[1];
     }
     template <class B> void Stop(B &b, const Keys &keys, bool allowRestore = false) {
         ReleaseMouse(b, keys);
-        ReleaseJump(b);
+        StopJump(b, keys, allowRestore);
         ReleaseSide(b, keys);
         StopPistol(b, keys, allowRestore);
         RestoreForward(b, keys, allowRestore);
@@ -308,13 +327,10 @@ class Controller {
         mouseInitialized_ = false;
         mouseSide_ = 0;
         mouseDirectionUntil_ = 0;
-        jumpReleasedAt_ = -1;
-        jumpReleaseTick_ = 0;
         toggleOn_ = false;
         activationHeld_ = false;
         activationMode_ = ~0u;
         targetSince_ = nextShot_ = 0;
-        jumpEngaged_ = false;
         lastTime_ = 0;
         stats_.target = stats_.flags = stats_.moveType = 0;
         stats_.speed = stats_.forwardMove = stats_.sideMove = 0;
@@ -333,8 +349,18 @@ class Controller {
             return;
         }
         if (owner_ != s.owner || (lastTick_ && s.tick && s.tick < lastTick_) ||
-            (lastTime_ > 0 && (delta <= 0 || delta > .15f)))
+            (lastTime_ > 0 && (delta <= 0 || delta > .15f))) {
             Stop(b, keys, true);
+            if (PendingRelease()) {
+                // A failed ownership handback must finish before a new player or
+                // simulation epoch can consume the previous jump/input state.
+                stats_.shoot = o.shoot ? Status::InputBlocked : Status::Off;
+                stats_.jump = o.jumper ? Status::InputBlocked : Status::Off;
+                stats_.strafe = o.strafer ? Status::InputBlocked : Status::Off;
+                stats_.pistol = o.autoPistol ? Status::InputBlocked : Status::Off;
+                return;
+            }
+        }
         owner_ = s.owner;
         lastTick_ = s.tick;
         lastTime_ = now;
@@ -451,33 +477,39 @@ class Controller {
         if (!o.jumper || !keys.Held(Space) || !Movable(s)) {
             if (o.jumper)
                 stats_.jump = !Movable(s) ? Status::UnsupportedMovement : Status::HoldKey;
-            ReleaseJump(b);
-            jumpEngaged_ = false;
-            jumpReleasedAt_ = -1;
+            StopJump(b, keys, true);
         } else {
-            if (!jumpEngaged_ && !jumpDown_ && Key(b, Space, false)) {
-                jumpEngaged_ = true;
-                jumpReleasedAt_ = now;
-                jumpReleaseTick_ = s.tick;
-            }
-            if (jumpDown_ && (now >= jumpUntil_ || !s.grounded)) {
-                ReleaseJump(b);
-                if (!jumpDown_) {
+            const double pressDuration = std::max(.02, 2. / o.tickRate);
+            if (!jumpEngaged_ && !jumpDown_) {
+                if (s.grounded) {
+                    // The real key-down already reached the window. Let the game
+                    // consume it instead of canceling it in the next worker poll.
+                    jumpEngaged_ = jumpInitialPress_ = true;
+                    jumpUntil_ = now + pressDuration;
+                    jumpPressTick_ = s.tick;
+                } else if (Key(b, Space, false)) {
+                    jumpEngaged_ = true;
                     jumpReleasedAt_ = now;
                     jumpReleaseTick_ = s.tick;
                 }
             }
-            // Never put release and press in the same input batch. Wait for a
-            // new command tick, with one tick of elapsed time as the fallback.
-            // A held press survives slow frames; a missed ground edge retries
-            // after this release interval instead of the former 150 ms pause.
+            if ((jumpDown_ || jumpInitialPress_) && (now >= jumpUntil_ || !s.grounded) && Key(b, Space, false)) {
+                jumpDown_ = jumpInitialPress_ = false;
+                jumpReleasedAt_ = now;
+                jumpReleaseTick_ = s.tick;
+            }
+            // Prime the release during flight, then press at the first eligible
+            // landing sample. Observed tick-base progress is not a command hook:
+            // Windows delivery remains best effort, not subtick synchronization.
             const bool releaseObserved = jumpReleasedAt_ >= 0 && now > jumpReleasedAt_ &&
                                          ((s.tick && jumpReleaseTick_ && s.tick > jumpReleaseTick_) ||
                                           now - jumpReleasedAt_ + 1e-9 >= 1. / o.tickRate);
-            if (jumpEngaged_ && s.grounded && !jumpDown_ && releaseObserved) {
+            const bool freshPressTick = !s.tick || !jumpPressTick_ || s.tick > jumpPressTick_;
+            if (jumpEngaged_ && s.grounded && !jumpDown_ && !jumpInitialPress_ && releaseObserved && freshPressTick) {
                 if (Key(b, Space, true)) {
                     jumpDown_ = true;
-                    jumpUntil_ = now + std::max(.02, 2. / o.tickRate);
+                    jumpUntil_ = now + pressDuration;
+                    jumpPressTick_ = s.tick;
                     ++stats_.jumps;
                 }
             }
@@ -604,13 +636,19 @@ class Controller {
                     suppressed_[i] = false;
             }
             if (ready) {
-                if (b.Yaw(s, plan.yaw)) {
-                    ++stats_.turns;
-                    stats_.strafe = Status::Steering;
+                const auto result = b.Yaw(s, plan.yaw);
+                if (result == YawResult::Applied || result == YawResult::Unchanged) {
+                    if (result == YawResult::Applied)
+                        ++stats_.turns;
+                    stats_.strafe = result == YawResult::Applied ? Status::Steering : Status::Aligned;
                     stats_.forwardMove = plan.forwardMove;
                     stats_.sideMove = plan.sideMove;
                 } else {
-                    ++stats_.failures;
+                    if (result == YawResult::Failed)
+                        ++stats_.failures;
+                    else
+                        stats_.strafe = Status::CameraBusy;
+                    strafeSince_ = -1;
                     RestoreForward(b, keys, true);
                 }
             }

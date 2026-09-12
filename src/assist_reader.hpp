@@ -24,7 +24,8 @@ inline bool AssistPawn(const Memory &m, std::uintptr_t pawn, std::uint32_t &hand
            (team == 2 || team == 3) && m.Field(pawn, offsets::SceneNode, scene) &&
            m.Field(scene, offsets::Dormant, dormant) && !dormant;
 }
-inline bool ReadAssistSample(const Memory &m, const assist::Addresses &a, assist::Sample &out) noexcept {
+inline bool ReadAssistSample(const Memory &m, const assist::Addresses &a, assist::Sample &out,
+                             bool readCombat = true) noexcept {
     out = {};
     std::uintptr_t list{}, pawn{}, controller{}, afterPawn{}, afterController{}, movement{};
     std::uint8_t team{}, scoped{}, wait{}, reloading{}, immune{};
@@ -38,9 +39,10 @@ inline bool ReadAssistSample(const Memory &m, const assist::Addresses &a, assist
         !m.Field(pawn, offsets::MovementFlags, s.flags))
         return false;
     s.anglesKnown = m.Read(a.angles, angles) && std::isfinite(angles.pitch) && std::abs(angles.pitch) <= 89.1f &&
-                    std::isfinite(angles.yaw) && std::abs(angles.yaw) <= 180.1f;
+                    std::isfinite(angles.yaw);
     if (s.anglesKnown) {
         s.pitch = angles.pitch;
+        // Retain the raw float for compare/exchange; planners normalize the desired yaw.
         s.yaw = angles.yaw;
     }
     const bool tickKnown = m.Field(controller, offsets::ControllerTick, s.tick) && s.tick > 0 && s.tick < 0x40000000u;
@@ -60,15 +62,15 @@ inline bool ReadAssistSample(const Memory &m, const assist::Addresses &a, assist
         if (m.Field(movement, offsets::MovementFriction, value) && std::isfinite(value) && value > 0 && value <= 2)
             s.friction = value;
     }
-    if (!m.Field(pawn, offsets::ShotsFired, s.shots) || s.shots > 300)
+    if (readCombat && (!m.Field(pawn, offsets::ShotsFired, s.shots) || s.shots > 300))
         s.shots = 0;
-    s.scoped = m.Field(pawn, offsets::IsScoped, scoped) && scoped == 1;
+    s.scoped = readCombat && m.Field(pawn, offsets::IsScoped, scoped) && scoped == 1;
     std::uintptr_t services{}, weapon{};
     std::uint32_t nextAttack{}, weaponAfter{};
     std::int32_t clip{}, index{}, indexAfter{};
-    if (m.Field(pawn, offsets::WeaponServices, services) && m.Field(services, offsets::ActiveWeapon, s.weaponHandle) &&
-        (weapon = EntityAt(m, list, s.weaponHandle)) && FullHandle(m, weapon, weaponAfter) &&
-        weaponAfter == s.weaponHandle &&
+    if (readCombat && m.Field(pawn, offsets::WeaponServices, services) &&
+        m.Field(services, offsets::ActiveWeapon, s.weaponHandle) && (weapon = EntityAt(m, list, s.weaponHandle)) &&
+        FullHandle(m, weapon, weaponAfter) && weaponAfter == s.weaponHandle &&
         m.Field(weapon, offsets::AttributeManager + offsets::ItemView + offsets::ItemDefinition, s.weapon)) {
         s.weaponKnown = combat::WeaponProfile(s.weapon) != 0;
         const bool magazine = m.Field(weapon, offsets::Clip1, clip) && clip >= 0 && clip <= 250;
@@ -84,7 +86,7 @@ inline bool ReadAssistSample(const Memory &m, const assist::Addresses &a, assist
         s.weaponReady =
             s.weaponKnown && s.readinessKnown && !s.empty && !s.reloading && !s.waitingAttack && !s.cooldown;
     }
-    if (m.Field(pawn, offsets::CrosshairIndex, index) && index > 0 &&
+    if (readCombat && m.Field(pawn, offsets::CrosshairIndex, index) && index > 0 &&
         static_cast<unsigned>(index) <= offsets::EntryMask) {
         s.targetKnown = true;
         const auto target = EntityAt(m, list, static_cast<unsigned>(index));

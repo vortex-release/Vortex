@@ -873,19 +873,19 @@ void Smoke(Graphics &g, const std::filesystem::path &directory) {
             Require(GetPrivateProfileIntW(L"Visual", L"assists.shoot", 0, profile.path.c_str()) == 1,
                     "Assisted Shoot saves without native input in preview");
             clickItem("Enable Assisted Shoot");
-            clickItem("Jumper");
+            clickItem("Movement");
             SaveBitmap(directory / L"vortex-jumper.bmp", g.ReadPixels(), g.width, g.height);
             clickItem("Enable Jumper");
             clickItem("Save");
             Require(GetPrivateProfileIntW(L"Visual", L"assists.jumper", 0, profile.path.c_str()) == 1,
                     "Jumper saves independently");
             clickItem("Enable Jumper");
-            clickItem("Strafer");
             SaveBitmap(directory / L"vortex-strafer.bmp", g.ReadPixels(), g.width, g.height);
             clickItem("Enable Strafer");
             clickItem("Save");
-            Require(GetPrivateProfileIntW(L"Visual", L"assists.strafer", 0, profile.path.c_str()) == 1,
-                    "Strafer saves independently");
+            Require(GetPrivateProfileIntW(L"Visual", L"assists.strafer", 0, profile.path.c_str()) == 1 &&
+                        GetPrivateProfileIntW(L"Visual", L"assists.jumper", 99, profile.path.c_str()) == 0,
+                    "Movement tab saves Strafer independently of Jumper");
             clickItem("Enable Strafer");
             clickItem("Server movement tuning");
             SaveBitmap(directory / L"vortex-strafer-tuning.bmp", g.ReadPixels(), g.width, g.height);

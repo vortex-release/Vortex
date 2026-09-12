@@ -1080,8 +1080,9 @@ inline bool DrawOverlayPanel(awareness::Configuration &c, awareness::VisualOptio
                     {"Player models", "visible wall fill chams material", "Models", 1},
                     {"Camera tracking", "aim fov smooth gun", "Tracking", 2},
                     {"Assisted Shoot", "trigger click fire activation", "Assisted Shoot", 2},
-                    {"Jumper", "jump bunny hop movement", "Jumper", 2},
-                    {"Strafer", "strafe air speed movement", "Strafer", 2},
+                    {"Movement", "jumper strafer bunny hop air speed", "Movement", 2},
+                    {"Jumper", "jump bunny hop movement", "Movement", 2},
+                    {"Strafer", "strafe air speed movement", "Movement", 2},
                     {"Recoil control", "rcs rifle smg weapon", "Recoil", 2},
                     {"Motion prediction", "lag latency compensation", "Latency", 2},
                     {"Camera FOV", "view zoom third person shoulder viewmodel scoped", "Camera", 2},
@@ -1204,39 +1205,39 @@ inline bool DrawOverlayPanel(awareness::Configuration &c, awareness::VisualOptio
                     studio::EndCard();
                     ImGui::EndTabItem();
                 }
-                if (studio::Tab("Jumper")) {
-                    studio::Card("Jumper", "Hold Space to jump again on the next detected landing.");
+                if (studio::Tab("Movement")) {
+                    studio::Card("Jumper");
                     changed |= FlagControl("Enable Jumper", v.assists.jumper);
-                    ImGui::TextDisabled("Hold Space");
+                    ImGui::TextDisabled("Hold Space to re-jump when you land.");
                     ImGui::Separator();
                     ImGui::TextDisabled("%s  /  Jumps: %llu", assist::Name(info.assists.jump), info.assists.jumps);
                     studio::EndCard();
-                    ImGui::EndTabItem();
-                }
-                if (studio::Tab("Strafer")) {
-                    studio::Card("Strafer", "Hold A or D in the air for velocity-based steering.");
+                    studio::Card("Strafer", "Uses your direction input to steer airborne movement.");
                     auto &o = v.assists;
                     changed |= FlagControl("Enable Strafer", o.strafer);
+                    ImGui::TextDisabled("Airborne steering to help maintain speed.");
                     if (BeginForm("Strafe mode")) {
                         int mode = static_cast<int>(o.strafeMode);
-                        if (ComboRow("Steering", mode, "Keys + camera\0Mouse direction\0")) {
+                        if (ComboRow("Steering", mode, "A / D steering\0Mouse direction\0")) {
                             o.strafeMode = mode;
                             changed = true;
                         }
                         ImGui::EndTable();
                     }
-                    ImGui::TextDisabled(o.strafeMode ? "Hold Space and move your mouse. A / D takes priority."
-                                                     : "Hold A or D while airborne");
-                    if (!o.strafeMode) {
-                        changed |= FlagControl("Respect forward input", o.preserveForward);
-                        changed |= FlagControl("Pause while walking", o.strafeWalkPause);
-                        if (BeginForm("Strafe controls")) {
+                    ImGui::TextDisabled(o.strafeMode ? "Hold Space and move your mouse; A / D takes priority."
+                                                     : "Hold A / D while airborne.");
+                    changed |= FlagControl("Respect forward input", o.preserveForward);
+                    changed |= FlagControl("Pause while walking", o.strafeWalkPause);
+                    if (BeginForm("Strafe controls")) {
+                        changed |= FloatRow("Minimum speed", o.minSpeed, 10, 400, "%.0f u/s");
+                        if (!o.strafeMode) {
                             changed |= FloatRow("Strength", o.strafeStrength, 0, 1, "%.2f");
                             changed |= FloatRow("Ease in", o.strafeRampMs, 0, 250, "%.0f ms");
                             changed |= FloatRow("Turn limit (deg/s)", o.turnRate, 30, 720, "%.0f");
-                            changed |= FloatRow("Minimum speed", o.minSpeed, 10, 400, "%.0f u/s");
-                            ImGui::EndTable();
                         }
+                        ImGui::EndTable();
+                    }
+                    if (!o.strafeMode) {
                         const bool tuningOpen = ImGui::CollapsingHeader("Server movement tuning");
                         awareness::testing::Record("Server movement tuning");
                         if (tuningOpen) {

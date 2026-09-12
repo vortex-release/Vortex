@@ -1,6 +1,7 @@
 #pragma once
 #include "assist_reader.hpp"
 #include "assist_input_state.hpp"
+#include "assist_timing.hpp"
 #include "window_bridge.hpp"
 #include "frame_clock.hpp"
 #include <thread>
@@ -33,6 +34,7 @@ class Runtime {
         Runtime &owner;
         const Request &request;
         const Sample &sample;
+        const Keys *plannedKeys{};
         bool Ready() {
             return GetTickCount64() <= request.deadline && owner.Allowed(request) &&
                    !owner.bridge_->AssistKeys().textInput;
@@ -43,7 +45,7 @@ class Runtime {
             if (down && key == Space) {
                 cs2::LocalMemory local;
                 Sample current;
-                if (!cs2::ReadAssistSample({&local, cs2::LocalMemory::Read}, request.addresses, current) ||
+                if (!cs2::ReadAssistSample({&local, cs2::LocalMemory::Read}, request.addresses, current, false) ||
                     current.owner != sample.owner || !current.grounded || !Movable(current) ||
                     !owner.bridge_->AssistKeys().Held(Space))
                     return false;
@@ -55,7 +57,7 @@ class Runtime {
                 if (!request.enabled || request.options.strafeMode != 1 || !physical.Held(Space) || physical.Held(A) ||
                     physical.Held(D) || physical.Held(LeftMouse) ||
                     (request.options.strafeWalkPause && physical.WalkingHeld()) ||
-                    !cs2::ReadAssistSample({&local, cs2::LocalMemory::Read}, request.addresses, current) ||
+                    !cs2::ReadAssistSample({&local, cs2::LocalMemory::Read}, request.addresses, current, false) ||
                     current.owner != sample.owner || !IsAirborne(current))
                     return false;
             }
@@ -116,30 +118,50 @@ class Runtime {
             i.mi.dwExtraInfo = InputTag;
             return SendInput(1, &i, sizeof(i)) == 1;
         }
-        bool Yaw(const Sample &expected, float yaw) {
-            if (!Ready())
+        bool RestoreJump() {
+            if (!Ready() || !owner.bridge_->AssistKeys().Held(Space))
                 return false;
+            INPUT i{};
+            i.type = INPUT_KEYBOARD;
+            i.ki.wScan = static_cast<WORD>(MapVirtualKeyW(Space, MAPVK_VK_TO_VSC));
+            i.ki.dwFlags = KEYEVENTF_SCANCODE;
+            i.ki.dwExtraInfo = InputTag;
+            return i.ki.wScan && SendInput(1, &i, sizeof(i)) == 1;
+        }
+        YawResult Yaw(const Sample &expected, float yaw) {
+            if (!Ready())
+                return YawResult::Yielded;
+            const auto physical = owner.bridge_->AssistKeys();
+            if (physical.Held(A) == physical.Held(D) || physical.Held(LeftMouse) ||
+                (request.options.strafeWalkPause && physical.WalkingHeld()) ||
+                (request.trackingEnabled && owner.bridge_->BindingHeld(request.trackingKey)) ||
+                (plannedKeys && (physical.Held(A) != plannedKeys->Held(A) || physical.Held(D) != plannedKeys->Held(D) ||
+                                 physical.Held(W) != plannedKeys->Held(W) || physical.Held(S) != plannedKeys->Held(S))))
+                return YawResult::Yielded;
             cs2::LocalMemory local;
             cs2::Memory m{&local, cs2::LocalMemory::Read};
             Sample current;
-            if (!cs2::ReadAssistSample(m, request.addresses, current) || current.owner != expected.owner ||
+            if (!cs2::ReadAssistSample(m, request.addresses, current, false) || current.owner != expected.owner ||
                 !IsAirborne(current) || !current.anglesKnown || !current.velocityKnown)
-                return false;
+                return YawResult::Yielded;
             const float turn = NormalizeYaw(yaw - expected.yaw);
             if (std::abs(turn) < .00001f)
-                return true;
-            // A fresh compare/exchange preserves pitch and host mouse motion. Yield if
-            // the player moved the camera significantly since the plan was sampled.
+                return YawResult::Unchanged;
+            // Keep the actual raw yaw as CAS expected bits, including unwrapped
+            // engine angles. Host input winning this race is a yield, not a turn.
             if (std::abs(NormalizeYaw(current.yaw - expected.yaw)) > .35f ||
                 std::abs(current.pitch - expected.pitch) > .35f)
-                return true;
+                return YawResult::Yielded;
             const auto result = cs2::CommitViewAngles(request.addresses.angles, {current.pitch, current.yaw, 0},
                                                       {-current.pitch, NormalizeYaw(current.yaw + turn)});
-            return result == S_OK || result == HRESULT_FROM_WIN32(ERROR_RETRY);
+            return result == S_OK                              ? YawResult::Applied
+                   : result == HRESULT_FROM_WIN32(ERROR_RETRY) ? YawResult::Yielded
+                                                               : YawResult::Failed;
         }
     };
     void Run() noexcept {
         Controller controller;
+        RecoilActivity recoilActivity;
         Request last;
         Sample sample;
         bool precision{};
@@ -163,21 +185,24 @@ class Runtime {
             }
             if (active) {
                 cs2::LocalMemory local;
-                cs2::ReadAssistSample({&local, cs2::LocalMemory::Read}, r.addresses, sample);
+                const bool readCombat =
+                    r.options.shoot || r.options.autoPistol || (r.options.strafer && r.recoilEnabled);
+                cs2::ReadAssistSample({&local, cs2::LocalMemory::Read}, r.addresses, sample, readCombat);
             }
-            Backend backend{*this, r, sample};
-            controller.Step(r.options, sample, keys, FrameSeconds(), active,
-                            (r.trackingEnabled && bridge_->BindingHeld(r.trackingKey)) ||
-                                (r.recoilEnabled && sample.shots > 0),
-                            backend, controlsSafe);
+            Backend backend{*this, r, sample, &keys};
+            const auto now = FrameSeconds();
+            const bool recoilBusy = recoilActivity.Update(sample, now, active && r.recoilEnabled);
+            controller.Step(r.options, sample, keys, now, active,
+                            (r.trackingEnabled && bridge_->BindingHeld(r.trackingKey)) || recoilBusy, backend,
+                            controlsSafe);
             bridge_->SuppressAssistRepeats(controller.SuppressedRepeats());
             {
                 std::scoped_lock lock(mutex_);
                 diagnostics_ = controller.GetStatus();
             }
             std::unique_lock lock(mutex_);
-            wake_.wait_for(lock, std::chrono::milliseconds(active && sample.valid ? 4 : 20),
-                           [&] { return stop_.load(); });
+            const auto pollMs = PollIntervalMs(active, sample.valid, r.options, keys);
+            wake_.wait_for(lock, std::chrono::milliseconds(pollMs), [&] { return stop_.load(); });
         }
         last.deadline = GetTickCount64() + 100;
         Backend backend{*this, last, sample};

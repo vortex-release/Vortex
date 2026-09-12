@@ -1,6 +1,7 @@
 #include "assist_features.hpp"
 #include "assist_reader.hpp"
 #include "assist_input_state.hpp"
+#include "assist_timing.hpp"
 #include <vector>
 #include <cstdio>
 #include <limits>
@@ -21,9 +22,10 @@ struct Event {
 };
 struct Fake {
     std::vector<Event> events;
-    bool fail{};
+    bool fail{}, failJumpRestore{};
     unsigned turns{};
     float yaw{};
+    YawResult yawResult{YawResult::Applied};
     bool Key(unsigned key, bool down) {
         if (fail)
             return false;
@@ -33,12 +35,15 @@ struct Fake {
     bool Mouse(bool down) { return Key(LeftMouse, down); }
     bool Pistol(bool down) { return Key(LeftMouse, down); }
     bool RestorePrimary() { return Key(LeftMouse, true); }
-    bool Yaw(const Sample &, float value) {
+    bool RestoreJump() { return !failJumpRestore && Key(Space, true); }
+    YawResult Yaw(const Sample &, float value) {
         if (fail)
-            return false;
-        ++turns;
-        yaw = value;
-        return true;
+            return YawResult::Failed;
+        if (yawResult == YawResult::Applied) {
+            ++turns;
+            yaw = value;
+        }
+        return yawResult;
     }
     unsigned Count(unsigned key, bool down) const {
         unsigned n{};
@@ -69,8 +74,12 @@ struct Fixture {
     std::vector<unsigned char> bytes = std::vector<unsigned char>(0x100000);
     Addresses addresses{base + 0x100, base + 0x108, base + 0x110, base + 0x200};
     cs2::Memory memory{this, Read};
+    unsigned combatReads{};
     static bool Read(void *self, std::uintptr_t address, void *out, std::size_t size) noexcept {
         auto &f = *static_cast<Fixture *>(self);
+        if (address == pawn + cs2::offsets::WeaponServices || address == pawn + cs2::offsets::ShotsFired ||
+            address == pawn + cs2::offsets::CrosshairIndex)
+            ++f.combatReads;
         if (address < base || address - base > f.bytes.size() || size > f.bytes.size() - (address - base))
             return false;
         std::memcpy(out, f.bytes.data() + address - base, size);
@@ -372,10 +381,14 @@ int main() {
         s.tick = 1;
         s.grounded = true;
         c.Step(o, s, k, 11.02, true, false, b);
-        Check(b.Count(Space, true) == 0, "tick rollback primes a fresh release instead of collapsing edges");
+        Check(c.GetStatus().jumps == 0, "tick rollback does not synthesize an immediate new jump");
         ++s.tick;
+        s.grounded = false;
         c.Step(o, s, k, 11.024, true, false, b);
-        Check(b.Count(Space, true) == 1, "new command tick after rollback rearms landing");
+        ++s.tick;
+        s.grounded = true;
+        c.Step(o, s, k, 11.044, true, false, b);
+        Check(c.GetStatus().jumps == 1, "fresh landing after rollback rearms once");
     }
     {
         Options pulse;
@@ -560,34 +573,39 @@ int main() {
         auto s = Player();
         s.tick = 200;
         c.Step(jump, s, k, 50, true, false, b);
-        Check(b.Count(Space, false) == 1 && b.Count(Space, true) == 0,
-              "ground engagement never sends jump up and down in the same poll");
+        Check(b.events.empty(), "ground engagement preserves the initial physical press");
+        ++s.tick;
         c.Step(jump, s, k, 50.004, true, false, b);
-        Check(b.Count(Space, true) == 0, "unchanged ground tick waits for the release to be observed");
-        ++s.tick;
-        c.Step(jump, s, k, 50.008, true, false, b);
-        Check(b.Count(Space, true) == 1, "fresh ground command observes release then jumps");
-        c.Step(jump, s, k, 50.032, true, false, b);
-        Check(b.Count(Space, false) == 1, "jump pulse is held through two simulation tick intervals");
-        c.Step(jump, s, k, 50.040, true, false, b);
-        Check(b.Count(Space, false) == 2 && b.Count(Space, true) == 1,
-              "missed grounded jump releases without same-poll repress");
-        ++s.tick;
-        c.Step(jump, s, k, 50.044, true, false, b);
-        Check(b.Count(Space, true) == 2, "missed ground edge retries promptly instead of waiting 150 milliseconds");
+        Check(b.events.empty(), "initial press survives until takeoff or bounded timeout");
         s.grounded = false;
-        c.Step(jump, s, k, 50.048, true, false, b);
+        c.Step(jump, s, k, 50.008, true, false, b);
+        Check(b.Count(Space, false) == 1, "takeoff primes the next jump during flight");
+        ++s.tick;
+        s.grounded = true;
+        c.Step(jump, s, k, 50.024, true, false, b);
+        Check(b.Count(Space, true) == 1, "first eligible landing sample re-jumps without another delay");
+        c.Step(jump, s, k, 50.060, true, false, b);
+        Check(b.Count(Space, false) == 2 && b.Count(Space, true) == 1,
+              "unconsumed jump pulse releases without same-poll repress");
+        c.Step(jump, s, k, 50.080, true, false, b);
+        Check(b.Count(Space, true) == 1, "stalled known simulation tick cannot accumulate repeated presses");
+        ++s.tick;
+        c.Step(jump, s, k, 50.084, true, false, b);
+        Check(b.Count(Space, true) == 2, "simulation progress permits one retry of an unconsumed jump");
+        s.grounded = false;
+        c.Step(jump, s, k, 50.088, true, false, b);
         for (int i = 1; i < 20; ++i)
-            c.Step(jump, s, k, 50.048 + i * .004, true, false, b);
+            c.Step(jump, s, k, 50.088 + i * .004, true, false, b);
         Check(b.Count(Space, true) == 2, "airborne frames do not consume jump press edges");
         c.Stop(b, k);
         s.grounded = true;
         s.tick = 0;
         c.Step(jump, s, k, 51, true, false, b);
-        c.Step(jump, s, k, 51.004, true, false, b);
-        Check(b.Count(Space, true) == 2, "missing tick still requires a separate release interval");
-        c.Step(jump, s, k, 51.016, true, false, b);
-        Check(b.Count(Space, true) == 3, "elapsed tick interval provides safe missing-tick recovery");
+        c.Step(jump, s, k, 51.032, true, false, b);
+        c.Step(jump, s, k, 51.036, true, false, b);
+        Check(b.Count(Space, true) == 2, "missing tick still preserves distinct release and press intervals");
+        c.Step(jump, s, k, 51.048, true, false, b);
+        Check(b.Count(Space, true) == 3, "elapsed tick interval provides missing-tick recovery");
     }
     {
         PhysicalInput physical;
@@ -800,6 +818,174 @@ int main() {
         c.Step(o, s, k, 100.012, false, false, b);
         Check(b.Count(A, false) == 1 && !c.PendingRelease(),
               "failed steering release is retained and retried during pause");
+    }
+    {
+        Options move;
+        move.strafer = 1;
+        move.strafeRampMs = 0;
+        auto s = Player();
+        s.grounded = false;
+        Keys k;
+        k.down[W] = true;
+        for (unsigned key : {A, D}) {
+            k.down[A] = key == A;
+            k.down[D] = key == D;
+            s.yaw = 0;
+            for (unsigned i = 0; i < 80; ++i) {
+                const auto plan = OptimizeStrafe(s, k, move, .004f);
+                s.yaw = plan.yaw;
+            }
+            Check(std::abs(s.yaw) > 30, "held W plus side escapes equal-speed plateau and reaches useful strafe angle");
+            Check((key == A ? s.yaw : -s.yaw) > 0, "plateau recovery follows the requested strafe side");
+        }
+    }
+    {
+        Options jump;
+        jump.jumper = 1;
+        auto s = Player();
+        s.tick = 100;
+        Keys k;
+        k.down[Space] = true;
+        Fake b;
+        Controller c;
+        c.Step(jump, s, k, 110, true, false, b);
+        Check(b.Count(Space, false) == 0, "initial physical jump is not canceled by an immediate synthetic release");
+    }
+    {
+        Options move;
+        move.strafer = 1;
+        move.preserveForward = 0;
+        move.strafeRampMs = 0;
+        auto s = Player();
+        s.grounded = false;
+        Keys k;
+        k.down[A] = k.down[W] = true;
+        Fake b;
+        Controller c;
+        b.yawResult = YawResult::Yielded;
+        c.Step(move, s, k, 120, true, false, b);
+        Check(c.GetStatus().turns == 0 && c.GetStatus().failures == 0 && c.GetStatus().strafe == Status::CameraBusy &&
+                  b.Count(W, true) == 1,
+              "camera race yields and restores forward without claiming a successful turn or input failure");
+        b.yawResult = YawResult::Unchanged;
+        c.Step(move, s, k, 120.004, true, false, b);
+        Check(c.GetStatus().turns == 0 && c.GetStatus().strafe == Status::Aligned,
+              "already aligned camera does not inflate applied-turn diagnostics");
+        b.yawResult = YawResult::Applied;
+        c.Step(move, s, k, 120.008, true, false, b);
+        Check(c.GetStatus().turns == 1, "only committed camera changes count as turns");
+        b.yawResult = YawResult::Failed;
+        c.Step(move, s, k, 120.012, true, false, b);
+        Check(c.GetStatus().turns == 1 && c.GetStatus().failures == 1 && c.GetStatus().strafe == Status::InputBlocked &&
+                  c.SuppressedRepeats() == 0,
+              "failed camera write restores manual forward and reports failure");
+    }
+    {
+        Options jump;
+        jump.jumper = 1;
+        auto s = Player();
+        s.grounded = false;
+        s.tick = 300;
+        Keys k;
+        k.down[Space] = true;
+        Fake b;
+        Controller c;
+        c.Step(jump, s, k, 130, true, false, b);
+        jump.jumper = 0;
+        b.fail = true;
+        c.Step(jump, s, k, 130.004, true, false, b);
+        Check(c.PendingRelease(), "failed Space handback retains ownership for a retry");
+        b.fail = false;
+        c.Step(jump, s, k, 130.008, true, false, b);
+        Check(b.Count(Space, true) == 1 && !c.PendingRelease() && c.SuppressedRepeats() == 0,
+              "disabling Jumper hands a still-held Space back even while airborne");
+        jump.jumper = 1;
+        c.Step(jump, s, k, 130.012, true, false, b);
+        c.Step(jump, s, k, 130.016, false, false, b, false);
+        Check(b.Count(Space, true) == 1 && !c.PendingRelease(), "focus loss never restores Space into another app");
+        c.Step(jump, s, k, 130.020, true, false, b);
+        k.down[Space] = false;
+        s.grounded = true;
+        ++s.tick;
+        c.Step(jump, s, k, 130.040, true, false, b);
+        Check(b.Count(Space, true) == 1 && c.GetStatus().jumps == 0,
+              "releasing physical Space cancels a pending landing jump");
+    }
+    {
+        Fixture f;
+        Sample s;
+        Options move;
+        move.strafer = 1;
+        Keys keys;
+        keys.down[A] = true;
+        f.Put(Fixture::pawn + cs2::offsets::MovementFlags, 0u);
+        for (float yaw : {450.f, -450.f, 1080.f}) {
+            f.Put(f.addresses.angles, cs2::NativeViewAngles{0, yaw, 0});
+            Check(cs2::ReadAssistSample(f.memory, f.addresses, s, false) && s.anglesKnown && s.yaw == yaw &&
+                      OptimizeStrafe(s, keys, move, .004f).active,
+                  "finite unwrapped yaw remains usable and retains raw compare-exchange bits");
+        }
+        Check(f.combatReads == 0 && !s.weaponKnown && !s.enemy && s.shots == 0,
+              "movement-only sampling omits weapon, shot and target reads");
+        Check(cs2::ReadAssistSample(f.memory, f.addresses, s) && f.combatReads > 0 && s.weaponKnown && s.enemy,
+              "default combat sampling preserves assisted-fire readiness");
+        f.Put(f.addresses.angles, cs2::NativeViewAngles{0, std::numeric_limits<float>::infinity(), 0});
+        Check(cs2::ReadAssistSample(f.memory, f.addresses, s, false) && !s.anglesKnown,
+              "nonfinite yaw cannot become a camera write");
+    }
+    {
+        RecoilActivity activity;
+        auto s = Player();
+        s.shots = 7;
+        Check(!activity.Update(s, 140, true), "historical shot count does not lock the strafe camera");
+        ++s.shots;
+        Check(activity.Update(s, 140.004, true), "observed new shot yields camera to recoil");
+        activity.Update(s, 140.1, true);
+        activity.Update(s, 140.2, true);
+        Check(!activity.Update(s, 140.305, true), "recoil camera ownership expires without another shot");
+        ++s.shots;
+        activity.Update(s, 140.31, true);
+        ++s.weaponHandle;
+        Check(!activity.Update(s, 140.32, true), "weapon change cannot inherit recoil ownership");
+        ++s.shots;
+        activity.Update(s, 140.33, true);
+        s.shots = 0;
+        Check(!activity.Update(s, 140.34, true), "shot counter reset clears recoil ownership");
+        ++s.shots;
+        activity.Update(s, 140.35, true);
+        Check(!activity.Update(s, 140.36, false), "disabled recoil releases its camera window");
+        Options options;
+        options.jumper = 1;
+        Keys keys;
+        keys.down[Space] = true;
+        Check(PollIntervalMs(true, true, options, keys) == 1, "held Jumper uses a bounded one-millisecond wait");
+        keys.down[Space] = false;
+        Check(PollIntervalMs(true, true, options, keys) == 4, "released jump returns to ordinary polling");
+        Check(PollIntervalMs(false, true, options, keys) == 20 && PollIntervalMs(true, false, options, keys) == 20,
+              "inactive or invalid state backs off without busy spinning");
+    }
+    {
+        Options jump;
+        jump.jumper = 1;
+        auto s = Player();
+        s.grounded = false;
+        s.tick = 100;
+        Keys keys;
+        keys.down[Space] = true;
+        Fake b;
+        Controller c;
+        c.Step(jump, s, keys, 150, true, false, b);
+        ++s.owner;
+        s.tick = 200;
+        s.grounded = true;
+        b.failJumpRestore = true;
+        c.Step(jump, s, keys, 150.020, true, false, b);
+        Check(b.Count(Space, true) == 0 && c.PendingRelease() && c.GetStatus().jump == Status::InputBlocked,
+              "failed ownership handback cannot reuse an old airborne release for a new player's jump");
+        b.failJumpRestore = false;
+        c.Step(jump, s, keys, 150.024, true, false, b);
+        Check(b.Count(Space, true) == 1 && c.GetStatus().jumps == 0,
+              "ownership handback retries before new jump control starts");
     }
     std::printf("Assist checks: %u checks, %u failures; synthetic input backend only.\n", checks, failures);
     return failures ? 1 : 0;
