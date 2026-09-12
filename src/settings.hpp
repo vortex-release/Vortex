@@ -10,6 +10,12 @@
 #include "assist_features.hpp"
 #include "visual_styles.hpp"
 #include "font_catalog.hpp"
+#include "camera_visuals.hpp"
+#include "scene_style.hpp"
+#include "grenade_lineups.hpp"
+#include "cosmetics_options.hpp"
+#include "weather_options.hpp"
+#include "scoreboard.hpp"
 namespace awareness {
 struct VisualOptions {
     std::uint32_t cornerBoxes{1}, fillBoxes{}, healthNumbers{1}, labelBackground{}, statusHud{}, lineOrigin{1};
@@ -34,6 +40,12 @@ struct VisualOptions {
     std::uint32_t softGlow{}, shadedFill{1};
     float glowStrength{.5f};
     Color haloColor{.22f, .82f, 1.f, 1.f};
+    cosmetics::Options cosmetics;
+    weather::Options weather;
+    scoreboard::Options scoreboard;
+    scene::Options scene;
+    lineups::Options lineups;
+    camera_visuals::Options cameraVisuals;
     flight::PathStyle paths;
     combat::Options combat;
     tracking::Options trackingProfiles;
@@ -41,14 +53,16 @@ struct VisualOptions {
     assist::Options assists;
     styling::Player playerStyle;
     styling::Sky sky;
-    std::uint32_t menuFont{}, hudFont{}, menuAnimations{1};
+    std::uint32_t menuFont{}, hudFont{}, menuAnimations{1}, menuPage{};
     std::uint32_t sessionBadge{1}, badgeLight{1};
     float badgeScale{1.f}, badgeOpacity{.94f};
     std::uint32_t spectators{1}, keepAwake{}, autoAccept{};
     float spectatorX{.98f}, spectatorY{.18f}, spectatorScale{1.f}, spectatorOpacity{.92f};
 };
 inline bool ValidVisualOptions(const VisualOptions &v) noexcept {
-    if (!assist::Valid(v.assists) || !styling::Valid(v.playerStyle) || !styling::Valid(v.sky))
+    if (!cosmetics::Valid(v.cosmetics) || !weather::Valid(v.weather) || !scoreboard::Valid(v.scoreboard) ||
+        !scene::Valid(v.scene) || !lineups::Valid(v.lineups) || !camera_visuals::Valid(v.cameraVisuals) ||
+        !assist::Valid(v.assists) || !styling::Valid(v.playerStyle) || !styling::Valid(v.sky))
         return false;
     if (v.sessionBadge > 1 || v.badgeLight > 1 || !std::isfinite(v.badgeScale) || v.badgeScale < .75f ||
         v.badgeScale > 1.5f || !std::isfinite(v.badgeOpacity) || v.badgeOpacity < .25f || v.badgeOpacity > 1)
@@ -58,7 +72,8 @@ inline bool ValidVisualOptions(const VisualOptions &v) noexcept {
         !std::isfinite(v.spectatorX) || v.spectatorX < 0 || v.spectatorX > 1 || !std::isfinite(v.spectatorY) ||
         v.spectatorY < 0 || v.spectatorY > 1 || !std::isfinite(v.spectatorScale) || v.spectatorScale < .75f ||
         v.spectatorScale > 1.5f || !std::isfinite(v.spectatorOpacity) || v.spectatorOpacity < .2f ||
-        v.spectatorOpacity > 1 || v.menuAnimations > 1 || v.spectators > 1 || v.keepAwake > 1 || v.autoAccept > 1)
+        v.spectatorOpacity > 1 || v.menuAnimations > 1 || v.menuPage > 6 || v.spectators > 1 || v.keepAwake > 1 ||
+        v.autoAccept > 1)
         return false;
     const auto colorValid = [](Color c) {
         return std::isfinite(c.r) && std::isfinite(c.g) && std::isfinite(c.b) && std::isfinite(c.a) && c.r >= 0 &&

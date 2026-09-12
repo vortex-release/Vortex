@@ -5,6 +5,16 @@ inline bool CombatPanel(int page, awareness::combat::Options &o, PanelActions &a
     if (page == 7) {
         studio::Card("Recoil");
         changed |= FlagControl("Enabled", o.recoil);
+        studio::Caption("Weapon groups");
+        if (ImGui::BeginTable("Recoil groups", 2, ImGuiTableFlags_SizingStretchSame)) {
+            const char *groups[]{"Other weapons", "Pistols", "SMGs", "Rifles", "Snipers", "Heavy"};
+            for (int i = 1; i < 6; ++i) {
+                ImGui::TableNextColumn();
+                changed |= FlagControl(groups[i], o.recoilGroups[i]);
+            }
+            ImGui::EndTable();
+        }
+        ImGui::Spacing();
         if (BeginForm("Recoil profile")) {
             FormRow("Weapon");
             const auto index = o.recoilSelection;
@@ -24,10 +34,19 @@ inline bool CombatPanel(int page, awareness::combat::Options &o, PanelActions &a
             ImGui::EndTable();
         }
         auto &custom = o.weapons[o.recoilSelection];
-        if (o.recoilSelection)
+        if (o.recoilSelection) {
+            if (BeginForm("Weapon activation")) {
+                int mode = static_cast<int>(custom.activation);
+                if (ComboRow("Activation", mode, "Use weapon group\0Enabled\0Disabled\0")) {
+                    custom.activation = mode;
+                    changed = true;
+                }
+                ImGui::EndTable();
+            }
             changed |= FlagControl("Use custom profile", custom.overrideDefault);
+        }
         if (o.recoilSelection && !custom.overrideDefault)
-            ImGui::TextDisabled("Using the Default profile. Enable custom profile to edit this weapon.");
+            ImGui::TextDisabled("Default tuning");
         auto &p = o.recoilSelection && !custom.overrideDefault ? o.weapons[0] : custom;
         ImGui::BeginDisabled(o.recoilSelection && !custom.overrideDefault);
         if (BeginForm("Recoil tuning")) {
@@ -61,7 +80,7 @@ inline bool CombatPanel(int page, awareness::combat::Options &o, PanelActions &a
             }
             ImGui::EndTable();
         }
-        ImGui::TextWrapped("Compensation pauses while the menu is open or the game is out of focus.");
+        studio::Tip("Pauses in menus or when the game loses focus.");
         if (o.recoilInput == 0 && ImGui::CollapsingHeader("Mouse calibration")) {
             ImGui::TextWrapped("Match these to m_yaw and m_pitch if you changed them in the game. Sensitivity and zoom "
                                "are read automatically.");
@@ -73,7 +92,7 @@ inline bool CombatPanel(int page, awareness::combat::Options &o, PanelActions &a
         }
         studio::EndCard();
     } else if (page == 4) {
-        studio::Card("Color", "Adjust the game image. Your menu colors stay the same.");
+        studio::Card("Color grading", "Optional screen-wide adjustments. These do not change world materials.");
         if (studio::Button("Neutral")) {
             o.contrast = 1;
             o.worldDarkness = o.sceneExposure = o.sceneVignette = o.sceneTintStrength = 0;
@@ -145,6 +164,20 @@ inline bool CombatPanel(int page, awareness::combat::Options &o, PanelActions &a
         }
         studio::EndCard();
     } else if (page == 8) {
+        studio::Card("Utility timers");
+        changed |= FlagControl("Countdowns", o.utilityTimers);
+        ImGui::BeginDisabled(!o.utilityTimers);
+        changed |= FlagControl("Fire timer", o.timerFire);
+        changed |= FlagControl("Smoke timer", o.timerSmoke);
+        studio::Tip("Smoke uses an estimated standard lifetime (~). Fire follows the engine lifetime. Timers work "
+                    "without area fills.");
+        if (BeginForm("Timer style")) {
+            changed |= FloatRow("Size", o.timerScale, .75f, 1.5f, "%.2f");
+            changed |= FloatRow("Range", o.timerRange, 5, 150, "%.0f m");
+            ImGui::EndTable();
+        }
+        ImGui::EndDisabled();
+        studio::EndCard();
         studio::Card("Utility areas");
         changed |= FlagControl("Show areas", o.areas);
         changed |= FlagControl("Replace particles", o.hideParticles);
@@ -232,6 +265,27 @@ inline bool CombatPanel(int page, awareness::combat::Options &o, PanelActions &a
                 }
                 if (soundStatus && *soundStatus)
                     ImGui::TextWrapped("%s", soundStatus);
+                studio::EndCard();
+                ImGui::EndTabItem();
+            }
+            if (studio::Tab("Hit feed")) {
+                studio::Card("Hit feed");
+                changed |= FlagControl("Show recent hits", o.hitLog);
+                ImGui::BeginDisabled(!o.hitLog);
+                changed |= FlagControl("Panel background", o.hitLogBackground);
+                if (BeginForm("Hit feed style")) {
+                    changed |= FloatRow("Duration", o.hitLogDuration, 1, 10, "%.1f s");
+                    float rows = static_cast<float>(o.hitLogRows);
+                    if (FloatRow("Rows", rows, 1, 8, "%.0f")) {
+                        o.hitLogRows = static_cast<std::uint32_t>(std::lround(rows));
+                        changed = true;
+                    }
+                    changed |= FloatRow("Size", o.hitLogScale, .75f, 1.5f, "%.2f");
+                    changed |= FloatRow("Horizontal position", o.hitLogX, 0, 1, "%.2f");
+                    changed |= FloatRow("Vertical position", o.hitLogY, 0, 1, "%.2f");
+                    ImGui::EndTable();
+                }
+                ImGui::EndDisabled();
                 studio::EndCard();
                 ImGui::EndTabItem();
             }

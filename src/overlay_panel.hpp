@@ -3,6 +3,7 @@
 #include "player_decoration.hpp"
 #include "presets.hpp"
 #include "cs2_offsets.hpp"
+#include "cs2_model_fill.hpp"
 #include "spectator_reader.hpp"
 #include "weapon_icons.hpp"
 #include "ui_theme.hpp"
@@ -10,9 +11,12 @@
 #include "preview_pose.hpp"
 #include "font_catalog.hpp"
 #include "profile_panel.hpp"
+#include "grenade_lineups_panel.hpp"
+#include "economy_catalog.hpp"
 #include "../app/app_paths.hpp"
 #include <cstdio>
 #include <cstring>
+#include <cctype>
 struct PanelInformation {
     const char *message{"Waiting for entity data"};
     bool cs2{}, ready{};
@@ -50,7 +54,19 @@ struct PanelInformation {
     std::uint32_t trackingWeapon{}, droppedWeapons{};
     std::uint64_t footstepEvents{};
     bool keepAwakeActive{};
+    bool trajectoryDepth{}, areaDepth{};
+    unsigned trajectoryVertices{}, trajectoryDrawCalls{}, areaCells{};
+    HRESULT trajectoryResult{S_FALSE};
     std::uint32_t utilityEntities{}, fireEntities{}, burningCells{}, fireReadFailures{}, areaCount{};
+    awareness::lineups::Controller *lineupController{};
+    awareness::lineups::PanelState *lineupPanel{};
+    const awareness::lineups::Capture *lineupCapture{};
+    awareness::cs2::ModelFillDiagnostics modelDiagnostics;
+    const awareness::cosmetics::Catalog *cosmeticsCatalog{};
+    const char *cosmeticsStatus{"Available in game"};
+    const char *weatherStatus{"Off"};
+    bool scoreboardReady{}, nativeFramesReady{};
+    std::uint32_t nativeFrameFailures{};
 };
 struct PanelActions {
     awareness::profiles::Request profile;
@@ -215,10 +231,8 @@ inline void SteamCard(const PanelMedia &media, float scale) {
     else {
         draw->AddCircleFilled({a.x + 18 * scale, a.y + 18 * scale}, 18 * scale,
                               studio::Packed(studio::Alpha(studio::Accent, .13f)), 32);
-        draw->AddCircle({a.x + 18 * scale, a.y + 13 * scale}, 5 * scale, studio::Packed(studio::Muted), 20,
-                        1.4f * scale);
-        draw->AddBezierQuadratic({a.x + 8 * scale, a.y + 29 * scale}, {a.x + 18 * scale, a.y + 16 * scale},
-                                 {a.x + 28 * scale, a.y + 29 * scale}, studio::Packed(studio::Muted), 1.4f * scale);
+        vortex::icons::Draw(draw, vortex::icons::Id::UserRound, {a.x + 7 * scale, a.y + 7 * scale}, 22 * scale,
+                            studio::Packed(studio::Muted));
     }
     draw->AddCircle({a.x + 18 * scale, a.y + 18 * scale}, 19 * scale,
                     studio::Packed(studio::Alpha(studio::Accent, .3f)), 32);
@@ -328,6 +342,8 @@ inline void DrawPreview(const awareness::Configuration &c, awareness::VisualOpti
 }
 #include "combat_panel.hpp"
 
+#include "cosmetics_panel.hpp"
+
 inline bool DrawFeatureSection(int section, awareness::Configuration &c, awareness::VisualOptions &v,
                                const PanelInformation &info, PanelActions &actions,
                                awareness::TrackingConfiguration &tracking, awareness::EffectsConfiguration &effects,
@@ -410,7 +426,7 @@ inline bool DrawFeatureSection(int section, awareness::Configuration &c, awarene
                 if (BeginForm("Model appearance")) {
                     if (info.cs2) {
                         int style = v.shadedFill ? 0 : 1;
-                        if (ComboRow("Style", style, "Textured\0Flat\0")) {
+                        if (ComboRow("Style", style, "Shaded\0Flat\0")) {
                             v.shadedFill = style == 0;
                             changed = true;
                         }
@@ -422,7 +438,7 @@ inline bool DrawFeatureSection(int section, awareness::Configuration &c, awarene
                 }
                 if (BeginForm("Mode")) {
                     int mode = static_cast<int>(effects.visibility);
-                    if (ComboRow("Fill", mode, "Single color\0Behind walls\0Two colors\0")) {
+                    if (ComboRow("Fill", mode, "Visible only\0Hidden only\0Two colors\0")) {
                         if (mode == 2 && effects.visibility != EffectVisibility::TwoColor)
                             effects.glowColor = {.65f, .15f, .95f, .85f};
                         effects.visibility = static_cast<EffectVisibility>(mode);
@@ -441,8 +457,13 @@ inline bool DrawFeatureSection(int section, awareness::Configuration &c, awarene
                     effects.glowColor = effects.materialColor;
                 if (info.cs2 && effects.materialEnabled && effects.visibility != EffectVisibility::AlwaysVisible &&
                     info.effectsState.status != EffectsStatus::Ready &&
-                    info.effectsState.status != EffectsStatus::NativeMaterialReady)
-                    ImGui::TextWrapped("%s", EffectsStatusText(info.effectsState.status));
+                    info.effectsState.status != EffectsStatus::NativeMaterialReady) {
+                    if (info.cs2 && info.effectsState.status == EffectsStatus::DepthUnavailable) {
+                        ImGui::TextDisabled("Visible model only");
+                        studio::Tip("Waiting for a valid scene depth buffer and matching player draw.");
+                    } else
+                        ImGui::TextWrapped("%s", EffectsStatusText(info.effectsState.status));
+                }
                 studio::EndCard();
                 ImGui::EndTabItem();
             }
@@ -520,6 +541,11 @@ inline bool DrawFeatureSection(int section, awareness::Configuration &c, awarene
                     ImGui::EndTable();
                 }
                 studio::EndCard();
+                ImGui::EndTabItem();
+            }
+
+            if (studio::Tab("Loadout")) {
+                changed |= DrawCosmeticsPanel(v.cosmetics, info.cosmeticsCatalog, info.cosmeticsStatus);
                 ImGui::EndTabItem();
             }
 
@@ -688,6 +714,11 @@ inline bool DrawFeatureSection(int section, awareness::Configuration &c, awarene
         studio::EndCard();
 
     } else if (section == 8) {
+        if (info.cs2) {
+            ImGui::TextDisabled("%s", info.trajectoryDepth ? "Scene depth ready" : "Waiting for scene depth");
+            studio::Tip("Trajectories use scene depth to separate visible and occluded sections. Bullets wait for "
+                        "valid depth.");
+        }
 
         studio::Card("Paths");
         if (ImGui::BeginTable("Path toggles", 2, ImGuiTableFlags_SizingStretchSame)) {
@@ -748,10 +779,26 @@ inline bool DrawFeatureSection(int section, awareness::Configuration &c, awarene
             ImGui::TextWrapped("%s", info.message);
             ImGui::Text("Frames %.0f   Read %.2f   Draw %.2f", info.fps, info.readMs, info.renderMs);
             ImGui::Text("Players %u   Skipped %u", info.pawns, info.failedReads);
-            ImGui::TextWrapped("%s", EffectsStatusText(info.effectsState.status));
+            if (info.cs2 && info.effectsState.status == EffectsStatus::DepthUnavailable)
+                ImGui::TextUnformatted("Visible model active; hidden model material unavailable");
+            else
+                ImGui::TextWrapped("%s", EffectsStatusText(info.effectsState.status));
             ImGui::TextWrapped("%s", TrackingStatusText(info.trackingState.status));
             if (info.cs2) {
                 ImGui::Text("Build %u / %u", info.gameBuild, info.offsetBuild);
+                const auto &models = info.modelDiagnostics;
+                ImGui::Text("Native frame dispatcher: %s   Fault mask %u",
+                            info.nativeFramesReady ? "connected" : "unavailable", info.nativeFrameFailures);
+                ImGui::Text("Hidden model bridge: %s   Queued %u   Matched %u",
+                            models.hiddenBridgeReady ? "ready" : "unavailable", models.hiddenQueued,
+                            models.hiddenMatched);
+                ImGui::Text("Hidden captures %u   Skipped %u", models.hiddenCaptured, models.hiddenDropped);
+                ImGui::Text("Model materials: flat %s / shaded %s", models.flatReady ? "ready" : "waiting",
+                            models.litReady ? "ready" : "waiting");
+                ImGui::Text("Model objects %u   Matched callbacks %u   Tinted primitives %u", models.selectedObjects,
+                            models.selectedCallbacks, models.generatedPackets);
+                ImGui::Text("Rejected ownership %u   Rejected model %u", models.rejectedOwnership,
+                            models.rejectedModels);
                 ImGui::Text("Utility %u   Infernos %u   Burning cells %u", info.utilityEntities, info.fireEntities,
                             info.burningCells);
                 ImGui::Text("Fire read failures %u   Draw areas %u", info.fireReadFailures, info.areaCount);
@@ -766,6 +813,12 @@ inline bool DrawFeatureSection(int section, awareness::Configuration &c, awarene
                 ImGui::Text("Effects %llu   Accepted %llu   Rejected %llu", info.tracerCallbacks, info.acceptedTracers,
                             info.rejectedTracers);
                 ImGui::Text("Projected %u   Outside view %u", info.visibleTracers, info.clippedTracers);
+                ImGui::Text("Trajectory depth %s   Vertices %u   Draws %u",
+                            info.trajectoryDepth ? "ready" : "unavailable", info.trajectoryVertices,
+                            info.trajectoryDrawCalls);
+                if (FAILED(info.trajectoryResult))
+                    ImGui::Text("Trajectory render %08X", static_cast<unsigned>(info.trajectoryResult));
+                ImGui::Text("Area depth %s   Cells %u", info.areaDepth ? "ready" : "unavailable", info.areaCells);
                 ImGui::Text("Weapon %u   Burst %u   Punch %.3f / %.3f", info.recoilWeapon, info.recoilShots,
                             info.recoilPunch.x, info.recoilPunch.y);
                 ImGui::Text("Failed recoil reads %llu", info.recoilReadFailures);
@@ -823,8 +876,6 @@ inline bool PresetPage(awareness::Configuration &c, awareness::VisualOptions &v,
     static ProfileState previous;
     static bool canUndo{};
     bool changed{};
-    ImGui::TextWrapped("A consistent violet and white palette, without background images. Choose a complete profile or "
-                       "restyle your current settings.");
     const auto remember = [&] {
         previous = {c, v, t, e};
         canUndo = true;
@@ -845,36 +896,52 @@ inline bool PresetPage(awareness::Configuration &c, awareness::VisualOptions &v,
             changed = true;
         }
     }
-    ImGui::Dummy({0, 12 * v.uiScale});
+    ImGui::Spacing();
     const char *names[]{"Signature", "Focus", "Broadcast"};
-    const char *labels[]{"YOUR SETUP, REFINED", "MINIMAL VISUALS", "OBSERVER VIEW"};
-    const char *descriptions[]{
-        "White model fill, violet tracers and utility paths. Recoil and compact hit feedback.",
-        "Opponent health, local tracers and throw preview. Model fill, halos and area volumes off.",
-        "Both teams, two-tone models, distances and damage. Target tracking and recoil off."};
-    const bool wide = ImGui::GetContentRegionAvail().x >= 610 * v.uiScale;
-    if (ImGui::BeginTable("Preset cards", wide ? 3 : 1, ImGuiTableFlags_SizingStretchSame)) {
-        for (int i = 0; i < 3; ++i) {
-            ImGui::TableNextColumn();
-            ImGui::PushID(i);
-            studio::Card(names[i], labels[i]);
-            ImGui::TextWrapped("%s", descriptions[i]);
-            if (wide)
-                ImGui::SetCursorPosY(172 * v.uiScale);
-            if (studio::Button("Apply profile", {-FLT_MIN, 34 * v.uiScale})) {
-                remember();
-                ApplyPreset(static_cast<Preset>(i), c, v, t, e);
-            }
-            studio::EndCard();
-            ImGui::PopID();
+    const char *labels[]{"Balanced", "Minimal", "Observer"};
+    const char *descriptions[]{"White model fill, accent tracers and utility paths. Recoil and hit feedback.",
+                               "Opponent health, local tracers and throw preview. Model fill, halos and volumes off.",
+                               "Both teams, two-tone models, distances and damage. Tracking and recoil off."};
+    studio::Card("Presets");
+    for (int i = 0; i < 3; ++i) {
+        ImGui::PushID(i);
+        const auto at = ImGui::GetCursorScreenPos();
+        const float w = ImGui::GetContentRegionAvail().x, scale = v.uiScale;
+        auto *d = ImGui::GetWindowDrawList();
+        d->AddRectFilled(at, {at.x + w, at.y + 52 * scale}, studio::Packed({1, 1, 1, .025f}), 6 * scale);
+        const float previewX = at.x + 17 * scale;
+        d->AddRect({previewX, at.y + 12 * scale}, {previewX + 15 * scale, at.y + 38 * scale},
+                   studio::Packed(studio::Accent), 2 * scale, 1.4f * scale);
+        if (i != 1)
+            d->AddRectFilled({previewX + 3 * scale, at.y + 15 * scale}, {previewX + 12 * scale, at.y + 35 * scale},
+                             studio::Packed(studio::Alpha(studio::Accent, .18f)));
+        d->AddText({at.x + 47 * scale, at.y + 8 * scale}, studio::Packed(studio::Text), names[i]);
+        d->AddText({at.x + 47 * scale, at.y + 29 * scale}, studio::Packed(studio::Muted), labels[i]);
+        ImGui::SetCursorScreenPos({at.x + w - 88 * scale, at.y + 10 * scale});
+        const bool apply = studio::Button("Apply", {80 * scale, 32 * scale});
+        awareness::testing::Record("Apply profile");
+        if (apply) {
+            remember();
+            ApplyPreset(static_cast<Preset>(i), c, v, t, e);
         }
+        studio::Tip(descriptions[i]);
+        ImGui::SetCursorScreenPos({at.x, at.y + 59 * scale});
+        ImGui::Dummy({0, 0});
+        ImGui::PopID();
+    }
+    studio::EndCard();
+    studio::Card("Quick controls");
+    if (ImGui::BeginTable("Quick controls", 2, ImGuiTableFlags_SizingStretchSame)) {
+        ImGui::TableNextColumn();
+        changed |= FlagControl("Player overlay", c.enabled);
+        ImGui::TableNextColumn();
+        changed |= FlagControl("Spectators", v.spectators);
+        ImGui::TableNextColumn();
+        changed |= FlagControl("Assisted Shoot", v.assists.shoot);
+        ImGui::TableNextColumn();
+        changed |= FlagControl("Recoil control", v.combat.recoil);
         ImGui::EndTable();
     }
-    ImGui::Dummy({0, 12 * v.uiScale});
-    studio::Card("Fine-tune every module");
-    ImGui::TextWrapped("Players handles labels and model effects. Assists keeps input controls together. "
-                       "Trajectories, World and Feedback each have their own space.");
-    ImGui::TextDisabled("INSERT opens the menu. Changes save automatically when Auto-save is on.");
     studio::EndCard();
     return changed;
 }
@@ -888,22 +955,29 @@ inline bool DrawOverlayPanel(awareness::Configuration &c, awareness::VisualOptio
     studio::Animations = v.menuAnimations != 0;
     const auto display = ImGui::GetIO().DisplaySize;
     ImGui::SetNextWindowPos({20, 20}, ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowSize({std::min(1100.f * s, display.x - 40), std::min(760.f * s, display.y - 40)},
+    ImGui::SetNextWindowSize({std::min(960.f * s, display.x - 40), std::min(660.f * s, display.y - 40)},
                              ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowSizeConstraints({std::min(720.f, display.x - 16), std::min(480.f, display.y - 16)}, display);
+    const ImVec2 maximum{std::max(240.f, display.x - 16), std::max(200.f, display.y - 16)};
+    ImGui::SetNextWindowSizeConstraints({std::min(640.f, maximum.x), std::min(420.f, maximum.y)}, maximum);
     if (ImGui::Begin("Observer", nullptr,
                      ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings |
                          ImGuiWindowFlags_NoScrollbar |
                          (interactive ? ImGuiWindowFlags_None : ImGuiWindowFlags_NoInputs))) {
-        const auto menuAt = ImGui::GetWindowPos(), menuSize = ImGui::GetWindowSize();
+        auto menuSize = ImGui::GetWindowSize();
+        menuSize = {std::min(menuSize.x, maximum.x), std::min(menuSize.y, maximum.y)};
+        ImGui::SetWindowSize(menuSize);
+        const auto oldAt = ImGui::GetWindowPos();
+        ImGui::SetWindowPos({std::clamp(oldAt.x, 8.f, std::max(8.f, display.x - menuSize.x - 8)),
+                             std::clamp(oldAt.y, 8.f, std::max(8.f, display.y - menuSize.y - 8))});
+        const auto menuAt = ImGui::GetWindowPos();
         actions.menuBounds = {menuAt.x, menuAt.y, menuAt.x + menuSize.x, menuAt.y + menuSize.y};
         auto *storage = ImGui::GetStateStorage();
         const auto key = ImGui::GetID("WorkspacePage");
-        int page = std::clamp(storage->GetInt(key, 0), 0, 6);
+        int page = std::clamp(storage->GetInt(key, static_cast<int>(v.menuPage)), 0, 6);
         const auto pos = ImGui::GetWindowPos();
         auto *draw = ImGui::GetWindowDrawList();
         const bool compact = ImGui::GetWindowWidth() < 840 * s;
-        const float side = (compact ? 154.f : 176.f) * s;
+        const float side = (compact ? 140.f : 158.f) * s;
         draw->AddRectFilled(pos, {pos.x + side + 20 * s, pos.y + ImGui::GetWindowHeight()},
                             studio::Packed({.059f, .059f, .071f, 1}), 14 * s, ImDrawFlags_RoundCornersLeft);
         draw->AddLine({pos.x + side + 20 * s, pos.y + 20 * s},
@@ -912,24 +986,19 @@ inline bool DrawOverlayPanel(awareness::Configuration &c, awareness::VisualOptio
         ImGui::BeginChild("Sidebar", {side, 0}, 0, ImGuiWindowFlags_NoScrollbar);
         auto p = ImGui::GetCursorScreenPos();
         draw = ImGui::GetWindowDrawList();
-        draw->AddRectFilled(p, {p.x + 34 * s, p.y + 34 * s}, studio::Packed(studio::Alpha(studio::Accent, .16f)),
-                            10 * s);
-        draw->AddLine({p.x + 9 * s, p.y + 10 * s}, {p.x + 17 * s, p.y + 25 * s}, studio::Packed(studio::Accent),
-                      2.5f * s);
-        draw->AddLine({p.x + 17 * s, p.y + 25 * s}, {p.x + 26 * s, p.y + 9 * s}, studio::Packed(studio::Text),
-                      2.5f * s);
+        vortex::brand::Mark(draw, {p.x + 17 * s, p.y + 17 * s}, 30 * s, studio::Packed(studio::Text),
+                            studio::Packed(studio::Accent));
         ImGui::Dummy({34 * s, 34 * s});
         ImGui::SameLine(0, 12 * s);
         ImGui::BeginGroup();
         ImGui::PushFont(nullptr, 21);
         ImGui::TextUnformatted("Vortex");
         ImGui::PopFont();
-        ImGui::TextDisabled("COUNTER-STRIKE 2");
+        ImGui::TextDisabled("CS2");
         ImGui::EndGroup();
-        ImGui::Dummy({0, 24 * s});
-        ImGui::TextDisabled("CONTROLS");
+        ImGui::Dummy({0, 18 * s});
         const char *pages[]{"Overview", "Players", "Assists", "Trajectories", "World", "Feedback", "Settings"};
-        const int icons[]{3, 0, 1, 6, 4, 5, 3};
+        const int icons[]{2, 0, 1, 6, 4, 5, 3};
         for (int i = 0; i < 7; ++i)
             if (studio::Nav(pages[i], icons[i], page == i))
                 page = i;
@@ -944,32 +1013,102 @@ inline bool DrawOverlayPanel(awareness::Configuration &c, awareness::VisualOptio
         SteamCard(media, s);
         ImGui::EndChild();
         storage->SetInt(key, page);
-        ImGui::SameLine(0, 28 * s);
+        if (v.menuPage != static_cast<std::uint32_t>(page)) {
+            v.menuPage = page;
+            changed = true;
+        }
+        ImGui::SameLine(0, 24 * s);
         ImGui::BeginGroup();
-        ImGui::TextColored(studio::Accent, "VORTEX  /  %s", pages[page]);
-        ImGui::SameLine();
-        ImGui::SetCursorPosX(ImGui::GetWindowWidth() - 80 * s);
-        if (studio::Button("Close", {58 * s, 25 * s}))
-            open = false;
-        const char *titles[]{"Make it yours.",     "Player visuals",      "Assists",         "Every path, in view.",
-                             "World & atmosphere", "Feedback that fits.", "Your preferences"};
-        const char *descriptions[]{"Complete profiles, ready to personalize.",
-                                   "Player labels, highlights, and direction indicators.",
-                                   "Tracking, shooting and movement assistance.",
-                                   "Bullet tracers, grenade previews and flight trails.",
-                                   "Scene contrast, utility areas and motion.",
-                                   "Hits, sounds and objective information.",
-                                   "Appearance, interface controls and live diagnostics."};
-        ImGui::PushFont(nullptr, 27);
-        ImGui::TextUnformatted(titles[page]);
+        const auto headerAt = ImGui::GetCursorScreenPos();
+        const float headerWidth = ImGui::GetContentRegionAvail().x;
+        ImGui::PushFont(nullptr, 23);
+        ImGui::TextUnformatted(pages[page]);
         ImGui::PopFont();
-        ImGui::PushStyleColor(ImGuiCol_Text, studio::Muted);
-        ImGui::PushTextWrapPos(ImGui::GetWindowWidth() - 24 * s);
-        ImGui::TextWrapped("%s", descriptions[page]);
-        ImGui::PopTextWrapPos();
-        ImGui::PopStyleColor();
-        ImGui::Dummy({0, 10 * s});
-        ImGui::BeginChild("Page", {0, -74 * s});
+        ImGui::SameLine();
+        ImGui::SetCursorScreenPos({headerAt.x + headerWidth - 28 * s, headerAt.y});
+        if (studio::IconButton("Close", vortex::icons::Id::X))
+            open = false;
+        static char search[96]{};
+        if (headerWidth > 470 * s) {
+            ImGui::SetCursorScreenPos({headerAt.x + headerWidth - 251 * s, headerAt.y});
+            ImGui::SetNextItemWidth(211 * s);
+            const bool searchEdited =
+                ImGui::InputTextWithHint("##FindSetting", "Find a setting...", search, sizeof(search));
+            awareness::testing::Record("Find a setting");
+            if ((searchEdited || ImGui::IsItemActivated()) && search[0])
+                ImGui::OpenPopup("Setting results");
+            ImGui::SetNextWindowPos({headerAt.x + headerWidth - 330 * s, headerAt.y + 34 * s});
+            ImGui::SetNextWindowSizeConstraints({290 * s, 0}, {420 * s, 350 * s});
+            if (ImGui::BeginPopup("Setting results", ImGuiWindowFlags_NoFocusOnAppearing)) {
+                struct Result {
+                    const char *title, *words, *tab;
+                    int page;
+                };
+                static constexpr Result entries[]{
+                    {"Profiles", "save import export config", "My profiles", 0},
+                    {"Presets", "palette default theme", "Presets", 0},
+                    {"Player labels", "boxes names health distance weapons", "General", 1},
+                    {"Player models", "visible wall fill chams material", "Models", 1},
+                    {"Camera tracking", "aim fov smooth gun", "Tracking", 2},
+                    {"Assisted Shoot", "trigger click fire activation", "Assisted Shoot", 2},
+                    {"Jumper", "jump bunny hop movement", "Jumper", 2},
+                    {"Strafer", "strafe air speed movement", "Strafer", 2},
+                    {"Recoil control", "rcs rifle smg weapon", "Recoil", 2},
+                    {"Motion prediction", "lag latency compensation", "Latency", 2},
+                    {"Camera FOV", "view zoom third person shoulder viewmodel scoped", "Camera", 2},
+                    {"Lineups", "grenade helper import export guides", "Lineups", 3},
+                    {"World materials", "map tint dusk brightness", "Materials", 4},
+                    {"Pistol repeat", "automatic semi auto pistol hold", "Assisted Shoot", 2},
+                    {"Bullet tracers", "bullet line glow lifetime", "Bullets", 3},
+                    {"Projectile paths", "grenade trajectory bounce trail", "Preview", 3},
+                    {"Post-processing", "scene exposure contrast color grading", "Post-processing", 4},
+                    {"Sky", "night midnight brightness", "Sky", 4},
+                    {"Utility areas", "fire molotov smoke splash puddle", "Utility areas", 4},
+                    {"Footsteps", "sound ring steps", "Footsteps", 4},
+                    {"Dropped weapons", "ground guns boxes", "Dropped weapons", 4},
+                    {"Player replay", "ghost delay history", "Player replay", 4},
+                    {"Hit feedback", "hitmarker damage sound", "Hits", 5},
+                    {"Hit feed", "history damage log recent hits", "Hit feed", 5},
+                    {"Utility timers", "grenade fire smoke countdown", "Utility areas", 4},
+                    {"Appearance", "font color theme scale", "Appearance", 6},
+                    {"Spectators and badge", "avatar steam pfp", "Interface", 6},
+                    {"Session", "awake auto accept matchmaking", "Session", 6},
+                    {"Diagnostics", "status debug latency fps", "Diagnostics", 6}};
+                const auto contains = [&](const char *text) {
+                    return std::search(text, text + std::strlen(text), search, search + std::strlen(search),
+                                       [](unsigned char a, unsigned char b) {
+                                           return std::tolower(a) == std::tolower(b);
+                                       }) != text + std::strlen(text);
+                };
+                int count{};
+                if (!search[0])
+                    ImGui::CloseCurrentPopup();
+                for (const auto &result : entries)
+                    if (search[0] && (contains(result.title) || contains(result.words))) {
+                        ++count;
+                        const bool selected = ImGui::Selectable(result.title);
+                        if (awareness::testing::enabled) {
+                            const auto anchor = std::string("Find: ") + result.title;
+                            awareness::testing::Record(anchor.c_str());
+                        }
+                        if (selected) {
+                            page = result.page;
+                            v.menuPage = page;
+                            storage->SetInt(key, page);
+                            changed = true;
+                            studio::RequestedTab = result.tab;
+                            search[0] = 0;
+                            ImGui::CloseCurrentPopup();
+                            break;
+                        }
+                    }
+                if (!count)
+                    ImGui::TextDisabled("No matching settings");
+                ImGui::EndPopup();
+            }
+        }
+        ImGui::SetCursorScreenPos({headerAt.x, headerAt.y + 43 * s});
+        ImGui::BeginChild("Page", {0, -48 * s});
         const bool wide = (page == 1) && ImGui::GetContentRegionAvail().x >= 650 * s;
         if (ImGui::BeginTable("Workspace", wide ? 2 : 1, ImGuiTableFlags_SizingStretchProp)) {
             if (wide) {
@@ -1002,14 +1141,20 @@ inline bool DrawOverlayPanel(awareness::Configuration &c, awareness::VisualOptio
                 }
                 if (studio::Tab("Assisted Shoot")) {
                     studio::Card("Assisted Shoot",
-                                 "Hold your chosen key to fire when an enemy is under the crosshair.");
+                                 "Clicks only on a valid enemy with a ready firearm. Manual firing takes priority.");
                     auto &o = v.assists;
                     changed |= FlagControl("Enable Assisted Shoot", o.shoot);
                     int selected =
                         static_cast<int>(std::find(assist::ShootKeys.begin(), assist::ShootKeys.end(), o.shootKey) -
                                          assist::ShootKeys.begin());
                     if (BeginForm("Shoot controls")) {
-                        if (ComboRow("Hold key", selected, "Mouse 4\0Mouse 5\0Left Alt\0Left Shift\0Left Ctrl\0")) {
+                        int mode = static_cast<int>(o.shootMode);
+                        if (ComboRow("Activation", mode, "Hold key\0Always\0Toggle key\0")) {
+                            o.shootMode = mode;
+                            changed = true;
+                        }
+                        if (o.shootMode != 1 &&
+                            ComboRow("Hold key", selected, "Mouse 4\0Mouse 5\0Left Alt\0Left Shift\0Left Ctrl\0")) {
                             o.shootKey = assist::ShootKeys[std::clamp(selected, 0, 4)];
                             changed = true;
                         }
@@ -1019,17 +1164,21 @@ inline bool DrawOverlayPanel(awareness::Configuration &c, awareness::VisualOptio
                         ImGui::EndTable();
                     }
                     changed |= FlagControl("Scoped only", o.scopeOnly);
+                    ImGui::Separator();
+                    changed |= FlagControl("Hold to repeat pistol fire", o.autoPistol);
+                    if (o.autoPistol && BeginForm("Pistol cadence")) {
+                        changed |= FloatRow("Minimum interval", o.pistolIntervalMs, 0, 500, "%.0f ms");
+                        ImGui::EndTable();
+                    }
+                    studio::Tip("Pistol repeat follows your left mouse hold. Zero uses weapon readiness.");
                     ImGui::TextDisabled("%s  /  Clicks: %llu", assist::Name(info.assists.shoot), info.assists.shots);
-                    ImGui::TextWrapped(
-                        "Enemies only. Waits for a loaded, ready firearm. Manual firing takes priority.");
                     studio::EndCard();
                     ImGui::EndTabItem();
                 }
                 if (studio::Tab("Jumper")) {
                     studio::Card("Jumper", "Hold Space to jump again on the next detected landing.");
                     changed |= FlagControl("Enable Jumper", v.assists.jumper);
-                    ImGui::TextWrapped("Uses your Space binding. Releases between jumps and pauses on ladders, in "
-                                       "water or while frozen.");
+                    ImGui::TextDisabled("Hold Space");
                     ImGui::Separator();
                     ImGui::TextDisabled("%s  /  Jumps: %llu", assist::Name(info.assists.jump), info.assists.jumps);
                     studio::EndCard();
@@ -1039,25 +1188,37 @@ inline bool DrawOverlayPanel(awareness::Configuration &c, awareness::VisualOptio
                     studio::Card("Strafer", "Hold A or D in the air for velocity-based steering.");
                     auto &o = v.assists;
                     changed |= FlagControl("Enable Strafer", o.strafer);
-                    if (BeginForm("Strafe controls")) {
-                        changed |= FloatRow("Turn limit (deg/s)", o.turnRate, 30, 720, "%.0f");
-                        changed |= FloatRow("Minimum speed", o.minSpeed, 10, 400, "%.0f u/s");
+                    if (BeginForm("Strafe mode")) {
+                        int mode = static_cast<int>(o.strafeMode);
+                        if (ComboRow("Steering", mode, "Keys + camera\0Mouse direction\0")) {
+                            o.strafeMode = mode;
+                            changed = true;
+                        }
                         ImGui::EndTable();
                     }
-                    ImGui::TextWrapped("Temporarily removes W/S input while strafing, then restores keys you still "
-                                       "hold. Pauses during aiming or firing.");
-                    const bool tuningOpen = ImGui::CollapsingHeader("Server movement tuning");
-                    awareness::testing::Record("Server movement tuning");
-                    if (tuningOpen) {
-                        if (BeginForm("Movement physics")) {
-                            changed |= FloatRow("Air acceleration", o.airAcceleration, 1, 200, "%.1f");
-                            changed |= FloatRow("Air speed cap", o.airSpeedCap, 1, 100, "%.1f");
-                            changed |= FloatRow("Tick rate", o.tickRate, 30, 128, "%.0f");
+                    ImGui::TextDisabled(o.strafeMode ? "Hold Space and move your mouse. A / D takes priority."
+                                                     : "Hold A or D while airborne");
+                    if (!o.strafeMode) {
+                        changed |= FlagControl("Respect forward input", o.preserveForward);
+                        changed |= FlagControl("Pause while walking", o.strafeWalkPause);
+                        if (BeginForm("Strafe controls")) {
+                            changed |= FloatRow("Strength", o.strafeStrength, 0, 1, "%.2f");
+                            changed |= FloatRow("Ease in", o.strafeRampMs, 0, 250, "%.0f ms");
+                            changed |= FloatRow("Turn limit (deg/s)", o.turnRate, 30, 720, "%.0f");
+                            changed |= FloatRow("Minimum speed", o.minSpeed, 10, 400, "%.0f u/s");
                             ImGui::EndTable();
                         }
-                        changed |= FlagControl("Use capped acceleration", o.cappedAcceleration);
-                        ImGui::TextWrapped(
-                            "Match these to the server. Different movement rules change the ideal angle.");
+                        const bool tuningOpen = ImGui::CollapsingHeader("Server movement tuning");
+                        awareness::testing::Record("Server movement tuning");
+                        if (tuningOpen) {
+                            if (BeginForm("Movement physics")) {
+                                changed |= FloatRow("Air acceleration", o.airAcceleration, 1, 200, "%.1f");
+                                changed |= FloatRow("Air speed cap", o.airSpeedCap, 1, 100, "%.1f");
+                                changed |= FloatRow("Tick rate", o.tickRate, 30, 128, "%.0f");
+                                ImGui::EndTable();
+                            }
+                            changed |= FlagControl("Use capped acceleration", o.cappedAcceleration);
+                        }
                     }
                     ImGui::TextDisabled("%s  /  Speed: %.0f u/s", assist::Name(info.assists.strafe),
                                         info.assists.speed);
@@ -1075,9 +1236,7 @@ inline bool DrawOverlayPanel(awareness::Configuration &c, awareness::VisualOptio
                         changed |= FloatRow("Strength", prediction.strength, 0, 1, "%.2f");
                         ImGui::EndTable();
                     }
-                    ImGui::TextWrapped(
-                        "Use a small offset. Sudden turns and stops can make long predictions overshoot.");
-                    ImGui::TextDisabled("Server ping and hit registration are unchanged.");
+                    studio::Tip("Predicts motion only; server ping and hit registration are unchanged.");
                     studio::EndCard();
                     ImGui::EndTabItem();
                 }
@@ -1087,20 +1246,77 @@ inline bool DrawOverlayPanel(awareness::Configuration &c, awareness::VisualOptio
                 }
                 if (studio::Tab("Camera")) {
                     studio::Card("Camera view");
+                    auto &camera = v.cameraVisuals;
                     changed |= FlagControl("Camera FOV", v.cameraFovEnabled);
+                    changed |= FlagControl("Remove visual recoil", camera.removeRecoil);
+                    changed |= FlagControl("Custom scoped FOV", camera.scopedFovEnabled);
                     if (BeginForm("Camera view")) {
                         changed |= FloatRow("View FOV", v.cameraFov, 60, 140);
+                        if (camera.scopedFovEnabled)
+                            changed |= FloatRow("Scoped FOV", camera.scopedFov, 10, 90);
                         ImGui::EndTable();
+                    }
+                    changed |= FlagControl("Custom viewmodel", camera.viewmodelEnabled);
+                    changed |= FlagControl("Hide viewmodel while scoped", camera.hideScoped);
+                    if (camera.viewmodelEnabled && BeginForm("Viewmodel")) {
+                        changed |= FloatRow("Weapon FOV", camera.viewmodelFov, 40, 120, "%.0f");
+                        changed |= FloatRow("Horizontal", camera.viewmodelOffset.x, -10, 10, "%.1f");
+                        changed |= FloatRow("Forward", camera.viewmodelOffset.y, -10, 10, "%.1f");
+                        changed |= FloatRow("Vertical", camera.viewmodelOffset.z, -10, 10, "%.1f");
+                        ImGui::EndTable();
+                    }
+                    changed |= FlagControl("Third-person camera", camera.thirdPerson);
+                    if (camera.thirdPerson) {
+                        changed |= FlagControl("Keep while scoped", camera.whileScoped);
+                        if (BeginForm("Camera position")) {
+                            changed |= FloatRow("Distance", camera.distance, 30, 200, "%.0f");
+                            changed |= FloatRow("Shoulder", camera.shoulder, -50, 50, "%.0f");
+                            changed |= FloatRow("Height", camera.height, -20, 40, "%.0f");
+                            ImGui::EndTable();
+                        }
                     }
                     studio::EndCard();
                     ImGui::EndTabItem();
                 }
                 ImGui::EndTabBar();
-            } else if (page == 3)
-                section(8);
-            else if (page == 4 && ImGui::BeginTabBar("WorldSections")) {
-                if (studio::Tab("Scene")) {
-                    section(4);
+            } else if (page == 3 && ImGui::BeginTabBar("TrajectorySections")) {
+                const bool requestedPath = studio::RequestedTab && (!std::strcmp(studio::RequestedTab, "Bullets") ||
+                                                                    !std::strcmp(studio::RequestedTab, "Preview"));
+                const bool pathsOpen = ImGui::BeginTabItem(
+                    "Paths", nullptr, requestedPath ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None);
+                awareness::testing::Record("Paths");
+                if (pathsOpen) {
+                    section(8);
+                    ImGui::EndTabItem();
+                }
+                if (studio::Tab("Lineups")) {
+                    if (info.lineupController && info.lineupPanel && info.lineupCapture)
+                        changed |= lineups::DrawPanel(*info.lineupPanel, v.lineups, *info.lineupController,
+                                                      *info.lineupCapture, awareness::FrameSeconds());
+                    ImGui::EndTabItem();
+                }
+                ImGui::EndTabBar();
+            } else if (page == 4 && ImGui::BeginTabBar("WorldSections")) {
+                if (studio::Tab("Materials")) {
+                    studio::Card("World materials");
+                    changed |= FlagControl("Tint map geometry", v.scene.enabled);
+                    changed |= ColorControl("Material tint", v.scene.tint, false);
+                    if (BeginForm("Map material values")) {
+                        changed |= FloatRow("Brightness", v.scene.brightness, 0, 2, "%.2f");
+                        ImGui::EndTable();
+                    }
+                    if (studio::Button("Original")) {
+                        v.scene = {};
+                        changed = true;
+                    }
+                    ImGui::SameLine();
+                    if (studio::Button("Dusk")) {
+                        v.scene.enabled = 1;
+                        v.scene.brightness = .55f;
+                        v.scene.tint = {.8f, .85f, 1, 1};
+                        changed = true;
+                    }
+                    studio::EndCard();
                     ImGui::EndTabItem();
                 }
                 if (studio::Tab("Sky")) {
@@ -1137,6 +1353,25 @@ inline bool DrawOverlayPanel(awareness::Configuration &c, awareness::VisualOptio
                     studio::EndCard();
                     ImGui::EndTabItem();
                 }
+                if (studio::Tab("Weather")) {
+                    studio::Card("Weather");
+                    changed |= FlagControl("Enable weather", v.weather.enabled);
+                    if (BeginForm("Weather style")) {
+                        int kind = static_cast<int>(v.weather.kind), density = static_cast<int>(v.weather.density);
+                        if (ComboRow("Effect", kind, "Rain\0Snow\0Ash\0")) {
+                            v.weather.kind = kind;
+                            changed = true;
+                        }
+                        if (ComboRow("Density", density, "Light\0Medium\0Dense\0")) {
+                            v.weather.density = density;
+                            changed = true;
+                        }
+                        ImGui::EndTable();
+                    }
+                    ImGui::TextDisabled("%s", info.weatherStatus);
+                    studio::EndCard();
+                    ImGui::EndTabItem();
+                }
                 if (studio::Tab("Utility areas")) {
                     changed |= CombatPanel(8, v.combat, actions, info.hitSoundStatus);
                     ImGui::EndTabItem();
@@ -1164,25 +1399,57 @@ inline bool DrawOverlayPanel(awareness::Configuration &c, awareness::VisualOptio
                     ImGui::EndTabItem();
                 }
                 if (studio::Tab("Dropped weapons")) {
-                    studio::Card("Dropped weapons", "Firearms on the ground. Held weapons are excluded.");
+                    studio::Card("Dropped weapons");
                     auto &o = v.worldVisuals;
                     changed |= FlagControl("Show dropped weapons", o.dropped);
                     changed |= FlagControl("3D bounds", o.dropBoxes);
                     changed |= FlagControl("Weapon icons", o.dropIcons);
                     changed |= FlagControl("Names", o.dropNames);
                     changed |= FlagControl("Distance", o.dropDistance);
+                    changed |= FlagControl("Ammo", o.dropAmmo);
                     if (BeginForm("Dropped style")) {
                         changed |= FloatRow("Range", o.dropRange, 5, 150, "%.0f m");
                         changed |= FloatRow("Width", o.dropWidth, .5f, 3, "%.1f");
                         ImGui::EndTable();
                     }
                     changed |= ColorControl("Color", o.dropColor);
+                    ImGui::Spacing();
+                    if (ImGui::CollapsingHeader("Categories", ImGuiTreeNodeFlags_DefaultOpen)) {
+                        static int category{};
+                        if (BeginForm("Dropped category")) {
+                            ComboRow("Category", category, "Pistols\0SMGs\0Rifles\0Snipers\0Heavy\0Utility\0");
+                            ImGui::EndTable();
+                        }
+                        auto &group = o.dropGroups[std::clamp(category, 0, 5)];
+                        changed |= FlagControl("Show category", group.enabled);
+                        ImGui::BeginDisabled(!group.enabled);
+                        changed |= FlagControl("Customize category", group.custom);
+                        studio::Tip("Uses the shared style above until customized. Utility falls back to names when an "
+                                    "icon is unavailable.");
+                        if (group.custom) {
+                            if (BeginForm("Category style")) {
+                                int dropDisplay = static_cast<int>(group.display);
+                                if (ComboRow("Display", dropDisplay, "Icon\0Name\0Icon and name\0None\0")) {
+                                    group.display = static_cast<std::uint32_t>(dropDisplay);
+                                    changed = true;
+                                }
+                                changed |= FloatRow("Range", group.range, 5, 150, "%.0f m");
+                                ImGui::EndTable();
+                            }
+                            changed |= ColorControl("Category color", group.color);
+                        }
+                        ImGui::EndDisabled();
+                    }
                     ImGui::TextDisabled("On the ground: %u", info.droppedWeapons);
                     studio::EndCard();
                     ImGui::EndTabItem();
                 }
                 if (studio::Tab("Player replay")) {
                     section(6);
+                    ImGui::EndTabItem();
+                }
+                if (studio::Tab("Post-processing")) {
+                    section(4);
                     ImGui::EndTabItem();
                 }
                 ImGui::EndTabBar();
@@ -1209,6 +1476,19 @@ inline bool DrawOverlayPanel(awareness::Configuration &c, awareness::VisualOptio
                         v.spectatorY = .18f;
                         changed = true;
                     }
+                    studio::EndCard();
+                    studio::Card("Scoreboard equipment");
+                    changed |= FlagControl("Show equipment on Tab", v.scoreboard.enabled);
+                    changed |= FlagControl("Weapon icons", v.scoreboard.weapons);
+                    changed |= FlagControl("Armor", v.scoreboard.armor);
+                    changed |= FlagControl("Bomb and defuse kit", v.scoreboard.objective);
+                    if (BeginForm("Scoreboard scale")) {
+                        changed |= FloatRow("Icon size", v.scoreboard.scale, .75f, 1.5f, "%.2fx");
+                        ImGui::EndTable();
+                    }
+                    if (v.scoreboard.enabled)
+                        ImGui::TextDisabled("%s",
+                                            info.scoreboardReady ? "Connected" : "Waiting for the game scoreboard");
                     studio::EndCard();
                     studio::Card("Session badge", "Your Steam profile and connection, in the top-right corner.");
                     changed |= FlagControl("Show session badge", v.sessionBadge);
@@ -1268,14 +1548,16 @@ inline bool DrawOverlayPanel(awareness::Configuration &c, awareness::VisualOptio
         awareness::testing::Record("Auto-save");
         if (ImGui::GetContentRegionAvail().x > 178 * s) {
             ImGui::SameLine();
-            ImGui::TextDisabled("%s", info.ready ? "Connected" : "Preview / waiting");
+            const char *status = info.profileIoBusy                              ? "Working..."
+                                 : info.settingsMessage && *info.settingsMessage ? info.settingsMessage
+                                 : info.ready                                    ? "Connected"
+                                                                                 : "Waiting for game";
+            const auto brief = vortex::brand::FitText(ImGui::GetFont(), ImGui::GetFontSize(), status,
+                                                      ImGui::GetContentRegionAvail().x);
+            ImGui::TextDisabled("%s", brief.c_str());
         }
-        ImGui::PushStyleColor(ImGuiCol_Text, studio::Muted);
-        ImGui::TextWrapped("%s",
-                           info.settingsMessage && *info.settingsMessage
-                               ? info.settingsMessage
-                               : "Save and Load use your working profile. Keep snapshots in Overview > My profiles.");
-        ImGui::PopStyleColor();
+        studio::Tip(info.settingsMessage && *info.settingsMessage ? info.settingsMessage
+                                                                  : "Save and Load use the working profile.");
 
         ImGui::EndGroup();
     }

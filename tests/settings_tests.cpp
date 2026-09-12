@@ -39,6 +39,61 @@ int main(int argc, char **argv) {
     visual.combat.sceneHighlights = -.2f;
     visual.assists.shoot = visual.assists.jumper = visual.assists.strafer = visual.assists.scopeOnly = 1;
     visual.assists.shootKey = assist::Mouse5;
+    visual.assists.shootMode = 2;
+    visual.assists.preserveForward = 0;
+    visual.assists.strafeStrength = .42f;
+    visual.menuPage = 4;
+    visual.cosmetics.enabled = 1;
+    visual.cosmetics.weapons[0] = {1, 37, 999, .375f, 1, 1234, {}};
+    strcpy_s(visual.cosmetics.weapons[0].name.data(), 64, "Vortex | Sapphire");
+    visual.cosmetics.knife = {1, 507, {1, 415, 4, .12f, 0, 0, {}}};
+    visual.cosmetics.glove = {1, 5030, {1, 10006, 22, .3f, 0, 0, {}}};
+    visual.cosmetics.agents = {4613, 4619};
+    visual.weather = {1, 2, 0};
+    visual.scoreboard = {1, 0, 1, 0, 1.25f};
+    visual.scene.enabled = 1;
+    visual.scene.brightness = .65f;
+    visual.scene.tint = {.2f, .4f, .6f, 1};
+    visual.lineups.enabled = 1;
+    visual.lineups.heldOnly = 0;
+    visual.lineups.range = 75;
+    visual.lineups.standTolerance = 12;
+    visual.lineups.aimTolerance = 2;
+    visual.lineups.color = {.3f, .5f, .7f, .8f};
+    strcpy_s(visual.lineups.mapOverride, "de_mirage");
+    visual.cameraVisuals.thirdPerson = 1;
+    visual.cameraVisuals.whileScoped = 1;
+    visual.cameraVisuals.removeRecoil = 1;
+    visual.cameraVisuals.scopedFovEnabled = 1;
+    visual.cameraVisuals.distance = 130;
+    visual.cameraVisuals.shoulder = -25;
+    visual.cameraVisuals.height = 15;
+    visual.cameraVisuals.scopedFov = 55;
+    visual.cameraVisuals.viewmodelEnabled = 1;
+    visual.cameraVisuals.hideScoped = 1;
+    visual.cameraVisuals.viewmodelFov = 82;
+    visual.cameraVisuals.viewmodelOffset = {1.5f, -2, 3};
+    visual.assists.strafeMode = 1;
+    visual.assists.autoPistol = 1;
+    visual.assists.pistolIntervalMs = 150;
+    visual.worldVisuals.dropAmmo = 1;
+    visual.assists.strafeWalkPause = 0;
+    visual.assists.strafeRampMs = 125;
+    visual.combat.utilityTimers = visual.combat.hitLog = 1;
+    visual.combat.timerFire = 0;
+    visual.combat.timerSmoke = 1;
+    visual.combat.timerScale = 1.25f;
+    visual.combat.timerRange = 95;
+    visual.combat.hitLogRows = 6;
+    visual.combat.hitLogBackground = 0;
+    visual.combat.hitLogDuration = 4.5f;
+    visual.combat.hitLogScale = 1.2f;
+    visual.combat.hitLogX = .4f;
+    visual.combat.hitLogY = .25f;
+    for (unsigned i = 0; i < worldvisuals::DropGroupCount; ++i)
+        visual.worldVisuals.dropGroups[i] = {i % 2, 1, i % 4, 25.f + i * 10, {.1f, .2f, .3f, .4f}};
+    visual.combat.recoilGroups = {0, 1, 0, 1, 0, 1};
+    visual.combat.weapons[1].activation = 2;
     visual.assists.cappedAcceleration = 0;
     visual.assists.delayMs = 60;
     visual.assists.intervalMs = 180;
@@ -102,6 +157,7 @@ int main(int argc, char **argv) {
     visual.hudFont = 5;
     visual.menuAnimations = 0;
     visual.paths.trailGlow = 0;
+    visual.paths.shotGlow = 1; // Explicit custom preference, independent of the quiet shipped defaults.
     visual.paths.previewGlow = 1;
     visual.paths.shotStrength = 2.75f;
     visual.paths.previewWidth = 3.5f;
@@ -153,9 +209,76 @@ int main(int argc, char **argv) {
     loaded.worldUnitsPerMeter = 39.3700787f;
     EffectsConfiguration loadedEffects;
     check(LoadSettings(path, loaded, loadedVisual, &loadedTracking, &loadedEffects), "load profile");
+    check(loadedVisual.scene.enabled && loadedVisual.scene.brightness == .65f && loadedVisual.scene.tint.b == .6f &&
+              loadedVisual.lineups.enabled && !loadedVisual.lineups.heldOnly && loadedVisual.lineups.range == 75 &&
+              loadedVisual.lineups.standTolerance == 12 && loadedVisual.lineups.aimTolerance == 2 &&
+              loadedVisual.lineups.color.a == .8f && !std::strcmp(loadedVisual.lineups.mapOverride, "de_mirage"),
+          "native scene and lineup settings round-trip including map and color");
+    check(loadedVisual.cosmetics == visual.cosmetics, "every loadout setting and bounded name round-trip");
+    auto nameBoundary = visual;
+    for (std::size_t i = 0; i < 21; ++i)
+        std::memcpy(nameBoundary.cosmetics.weapons[0].name.data() + i * 3, "\xE2\x82\xAC", 3);
+    nameBoundary.cosmetics.weapons[0].name[63] = 0;
+    check(SaveSettings(path, config, nameBoundary, tracking, effects) &&
+              LoadSettings(path, loaded, loadedVisual, &loadedTracking, &loadedEffects) &&
+              loadedVisual.cosmetics == nameBoundary.cosmetics,
+          "maximum-length UTF-8 name survives INI hex serialization");
+    const auto finishSection = L"Finish." + std::to_wstring(WeaponIcons[0].id);
+    for (const auto invalidName : {L"GG", L"00", L"C0AF", L"41A", L"0A"}) {
+        WritePrivateProfileStringW(finishSection.c_str(), L"NameHex", invalidName, path.c_str());
+        check(!LoadSettings(path, loaded, loadedVisual, &loadedTracking, &loadedEffects) &&
+                  loadedVisual.cosmetics == nameBoundary.cosmetics,
+              "malformed, control, NUL or invalid UTF-8 names reject the entire profile atomically");
+    }
+    check(SaveSettings(path, config, visual, tracking, effects), "restore loadout fixture");
+    WritePrivateProfileStringW(L"Cosmetics", nullptr, nullptr, path.c_str());
+    WritePrivateProfileStringW(L"Finish.Knife", nullptr, nullptr, path.c_str());
+    WritePrivateProfileStringW(L"Finish.Glove", nullptr, nullptr, path.c_str());
+    for (const auto &weapon : WeaponIcons) {
+        const auto section = L"Finish." + std::to_wstring(weapon.id);
+        WritePrivateProfileStringW(section.c_str(), nullptr, nullptr, path.c_str());
+    }
+    check(LoadSettings(path, loaded, loadedVisual, &loadedTracking, &loadedEffects) &&
+              loadedVisual.cosmetics == cosmetics::Options{},
+          "older profiles reset missing loadout fields to disabled defaults");
+    check(SaveSettings(path, config, visual, tracking, effects) &&
+              LoadSettings(path, loaded, loadedVisual, &loadedTracking, &loadedEffects),
+          "restore complete profile after compatibility checks");
+
+    check(loadedVisual.weather.enabled == 1 && loadedVisual.weather.kind == 2 && loadedVisual.weather.density == 0 &&
+              loadedVisual.scoreboard == visual.scoreboard,
+          "weather and scoreboard profile round-trip");
+    check(loadedVisual.cameraVisuals.thirdPerson && loadedVisual.cameraVisuals.whileScoped &&
+              loadedVisual.cameraVisuals.removeRecoil && loadedVisual.cameraVisuals.scopedFovEnabled &&
+              loadedVisual.cameraVisuals.distance == 130 && loadedVisual.cameraVisuals.shoulder == -25 &&
+              loadedVisual.cameraVisuals.height == 15 && loadedVisual.cameraVisuals.scopedFov == 55 &&
+              loadedVisual.cameraVisuals.viewmodelEnabled && loadedVisual.cameraVisuals.hideScoped &&
+              loadedVisual.cameraVisuals.viewmodelFov == 82 && loadedVisual.cameraVisuals.viewmodelOffset.y == -2 &&
+              loadedVisual.assists.strafeMode == 1 && loadedVisual.assists.autoPistol &&
+              loadedVisual.assists.pistolIntervalMs == 150 && loadedVisual.worldVisuals.dropAmmo,
+          "camera, movement mode, pistol cadence and magazine settings round-trip");
     check(loadedVisual.sessionBadge == 0 && loadedVisual.badgeLight == 0 && loadedVisual.badgeScale == 1.25f &&
               loadedVisual.badgeOpacity == .7f,
           "badge appearance round trips");
+    check(loadedVisual.menuPage == 4 && loadedVisual.assists.shootMode == 2 && !loadedVisual.assists.preserveForward &&
+              loadedVisual.assists.strafeStrength == .42f &&
+              loadedVisual.combat.recoilGroups == visual.combat.recoilGroups &&
+              loadedVisual.combat.weapons[1].activation == 2,
+          "menu, activation modes, movement strength and recoil groups survive saving");
+    check(!loadedVisual.assists.strafeWalkPause && loadedVisual.assists.strafeRampMs == 125,
+          "walk intent and steering ramp survive saving");
+    const auto &newCombat = loadedVisual.combat;
+    check(newCombat.utilityTimers && newCombat.hitLog && !newCombat.timerFire && newCombat.timerSmoke &&
+              newCombat.timerScale == 1.25f && newCombat.timerRange == 95 && newCombat.hitLogRows == 6 &&
+              !newCombat.hitLogBackground && newCombat.hitLogDuration == 4.5f && newCombat.hitLogScale == 1.2f &&
+              newCombat.hitLogX == .4f && newCombat.hitLogY == .25f,
+          "timer and feed options round trip");
+    for (unsigned i = 0; i < worldvisuals::DropGroupCount; ++i) {
+        const auto &g = loadedVisual.worldVisuals.dropGroups[i];
+        check(g.enabled == i % 2 && g.custom == 1 && g.display == i % 4 && g.range == 25.f + i * 10 &&
+                  g.color.r == .1f && g.color.g == .2f && g.color.b == .3f && g.color.a == .4f,
+              "all dropped categories survive saving independently");
+    }
     const auto &assists = loadedVisual.assists;
     check(assists.shoot && assists.jumper && assists.strafer && assists.scopeOnly &&
               assists.shootKey == assist::Mouse5 && !assists.cappedAcceleration && assists.delayMs == 60 &&
@@ -262,10 +385,12 @@ int main(int argc, char **argv) {
     for (const auto key :
          {L"paths.trailGlow", L"paths.previewGlow", L"paths.shotGlow", L"menuFont", L"hudFont", L"menuAnimations"})
         WritePrivateProfileStringW(L"Visual", key, nullptr, path.c_str());
-    check(LoadSettings(path, loaded, loadedVisual) && loadedVisual.paths.trailGlow && loadedVisual.paths.shotGlow &&
+    loadedVisual.paths.trailGlow = loadedVisual.paths.shotGlow = loadedVisual.paths.previewGlow = 1;
+    check(LoadSettings(path, loaded, loadedVisual) && !loadedVisual.paths.trailGlow && !loadedVisual.paths.shotGlow &&
               !loadedVisual.paths.previewGlow && loadedVisual.menuFont == 0 && loadedVisual.hudFont == 0 &&
-              loadedVisual.menuAnimations,
-          "legacy profiles get strong flight and shot glow, plain previews and animated menus");
+              loadedVisual.menuAnimations && loadedVisual.paths.shotStrength == 2.75f &&
+              loadedVisual.paths.previewWidth == 3.5f,
+          "missing legacy glow flags get quiet defaults without inheriting active flags or losing saved tuning");
     check(SaveSettings(path, config, visual, tracking, effects) && LoadSettings(path, loaded, loadedVisual),
           "restore appearance round trip");
     check(loadedVisual.softGlow && loadedVisual.glowStrength == .36f && loadedVisual.haloColor.a == .9f,

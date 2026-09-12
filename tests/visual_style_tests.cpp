@@ -9,9 +9,10 @@ struct Fixture {
     static constexpr std::uintptr_t base = 0x10000000, list = base + 0x1000, chunk = base + 0x10000,
                                     pawn = base + 0x40000, name = base + 0x80000;
     std::vector<unsigned char> bytes = std::vector<unsigned char>(0x100000);
-    unsigned writes{}, failAt{};
+    unsigned writes{}, failAt{}, reads{};
     static bool Read(void *self, std::uintptr_t at, void *out, std::size_t n) noexcept {
         auto &f = *static_cast<Fixture *>(self);
+        ++f.reads;
         if (at < base || at - base > f.bytes.size() || n > f.bytes.size() - (at - base))
             return false;
         std::memcpy(out, f.bytes.data() + at - base, n);
@@ -101,6 +102,37 @@ int main() {
     tint.Clear(f.Access());
     check(f.writes == previous && f.Get<unsigned char>(Fixture::pawn + offsets::SkyTint) == 77,
           "recycled sky identity never receives old restoration");
+    {
+        Fixture sparse;
+        constexpr std::uint32_t slot = 32 * 512 + 5;
+        constexpr auto clientChunk = Fixture::base + 0x20000;
+        constexpr auto identity = clientChunk + 5 * offsets::EntityStride;
+        sparse.Put(Fixture::chunk + 4 * offsets::EntityStride, std::uintptr_t{});
+        sparse.Put(Fixture::list + offsets::EntityTable + 32 * sizeof(std::uintptr_t), clientChunk);
+        sparse.Put(identity, Fixture::pawn);
+        sparse.Put(identity + 0x10, 0x80000u + slot);
+        sparse.Put(identity + offsets::DesignerName, Fixture::name);
+        sparse.Put(Fixture::pawn + offsets::Identity, identity);
+        sparse.Put(Fixture::list + offsets::HighestEntity, 4);
+        SkyTint distantSky;
+        const auto first = distantSky.Update(sparse.Access(), Fixture::list, sky, 1, true);
+        check(!first.applied && sparse.reads < 150, "sky discovery bounds each worker sample to 128 allocated slots");
+        unsigned applied{};
+        for (unsigned i = 1; i < 8 && !applied; ++i)
+            applied = distantSky.Update(sparse.Access(), Fixture::list, sky, 1 + i * .01, true).applied;
+        check(applied == 1 && sparse.Get<unsigned char>(Fixture::pawn + offsets::SkyTint) == 40,
+              "sky discovery reaches sparse client-only chunks beyond reported highest entity");
+        check(distantSky.Clear(sparse.Access()) && sparse.Get<float>(Fixture::pawn + offsets::SkyBrightness) == .8f,
+              "sparse client sky retains exact ownership restoration");
+    }
+    {
+        Fixture missingHighest;
+        missingHighest.Put(Fixture::list + offsets::HighestEntity, 0);
+        SkyTint independent;
+        check(independent.Update(missingHighest.Access(), Fixture::list, sky, 2, true).applied == 1,
+              "missing highest-entity metadata does not disable validated sky discovery");
+        independent.Clear(missingHighest.Access());
+    }
     styling::Player style;
     style.tintSaturation = 0;
     const auto grey = styling::Tint(Color{.2f, .6f, .8f, .3f}, style);

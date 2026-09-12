@@ -1,0 +1,1 @@
+Vortex monogram. Two filled geometric facets on a 32-unit grid. The SVG, `src/branding.hpp`, and Windows icon use identical geometry. Keep the left facet white and the right facet the current interface accent. No generated raster artwork or third-party symbol is used. `python scripts/generate-brand.py` exports the Windows icon from these same coordinates.

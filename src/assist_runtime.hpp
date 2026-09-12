@@ -13,7 +13,7 @@ struct Request {
     HWND window{};
     ULONGLONG deadline{};
     unsigned trackingKey{};
-    bool trackingEnabled{}, enabled{};
+    bool trackingEnabled{}, recoilEnabled{}, enabled{};
 };
 class Runtime {
     std::mutex mutex_;
@@ -44,7 +44,19 @@ class Runtime {
                 cs2::LocalMemory local;
                 Sample current;
                 if (!cs2::ReadAssistSample({&local, cs2::LocalMemory::Read}, request.addresses, current) ||
-                    current.owner != sample.owner || !current.grounded || !Movable(current))
+                    current.owner != sample.owner || !current.grounded || !Movable(current) ||
+                    !owner.bridge_->AssistKeys().Held(Space))
+                    return false;
+            }
+            if (down && (key == A || key == D)) {
+                const auto physical = owner.bridge_->AssistKeys();
+                cs2::LocalMemory local;
+                Sample current;
+                if (!request.enabled || request.options.strafeMode != 1 || !physical.Held(Space) || physical.Held(A) ||
+                    physical.Held(D) || physical.Held(LeftMouse) ||
+                    (request.options.strafeWalkPause && physical.WalkingHeld()) ||
+                    !cs2::ReadAssistSample({&local, cs2::LocalMemory::Read}, request.addresses, current) ||
+                    current.owner != sample.owner || !IsAirborne(current))
                     return false;
             }
             INPUT i{};
@@ -66,7 +78,9 @@ class Runtime {
                 Sample current;
                 if (!cs2::ReadAssistSample({&local, cs2::LocalMemory::Read}, request.addresses, current) ||
                     current.owner != sample.owner || current.weaponHandle != sample.weaponHandle ||
-                    current.target != sample.target || !CrosshairEnemy(current) || !current.weaponReady)
+                    current.target != sample.target || !CrosshairEnemy(current) || !current.weaponReady ||
+                    current.frozen || (request.options.scopeOnly && !current.scoped) ||
+                    owner.bridge_->AssistKeys().Held(LeftMouse))
                     return false;
             }
             INPUT i{};
@@ -75,20 +89,53 @@ class Runtime {
             i.mi.dwExtraInfo = InputTag;
             return SendInput(1, &i, sizeof(i)) == 1;
         }
+        bool Pistol(bool down) {
+            if (down) {
+                if (!Ready() || !request.enabled || !request.options.autoPistol ||
+                    !owner.bridge_->AssistKeys().Held(LeftMouse))
+                    return false;
+                cs2::LocalMemory local;
+                Sample current;
+                if (!cs2::ReadAssistSample({&local, cs2::LocalMemory::Read}, request.addresses, current) ||
+                    current.owner != sample.owner || current.weaponHandle != sample.weaponHandle ||
+                    !SemiAutomaticPistol(current.weapon) || !current.weaponReady || current.frozen)
+                    return false;
+            }
+            INPUT i{};
+            i.type = INPUT_MOUSE;
+            i.mi.dwFlags = down ? MOUSEEVENTF_LEFTDOWN : MOUSEEVENTF_LEFTUP;
+            i.mi.dwExtraInfo = InputTag;
+            return SendInput(1, &i, sizeof(i)) == 1;
+        }
+        bool RestorePrimary() {
+            if (!Ready() || !owner.bridge_->AssistKeys().Held(LeftMouse))
+                return false;
+            INPUT i{};
+            i.type = INPUT_MOUSE;
+            i.mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
+            i.mi.dwExtraInfo = InputTag;
+            return SendInput(1, &i, sizeof(i)) == 1;
+        }
         bool Yaw(const Sample &expected, float yaw) {
             if (!Ready())
                 return false;
             cs2::LocalMemory local;
             cs2::Memory m{&local, cs2::LocalMemory::Read};
-            std::uintptr_t pawn{};
-            std::uint32_t handle{};
-            if (!m.Read(request.addresses.pawnSlot, pawn) || !cs2::FullHandle(m, pawn, handle) ||
-                handle != expected.owner)
+            Sample current;
+            if (!cs2::ReadAssistSample(m, request.addresses, current) || current.owner != expected.owner ||
+                !IsAirborne(current) || !current.anglesKnown || !current.velocityKnown)
                 return false;
-            if (std::abs(NormalizeYaw(yaw - expected.yaw)) < .00001f)
+            const float turn = NormalizeYaw(yaw - expected.yaw);
+            if (std::abs(turn) < .00001f)
                 return true;
-            return cs2::CommitViewAngles(request.addresses.angles, {expected.pitch, expected.yaw, 0},
-                                         {-expected.pitch, yaw}) == S_OK;
+            // A fresh compare/exchange preserves pitch and host mouse motion. Yield if
+            // the player moved the camera significantly since the plan was sampled.
+            if (std::abs(NormalizeYaw(current.yaw - expected.yaw)) > .35f ||
+                std::abs(current.pitch - expected.pitch) > .35f)
+                return true;
+            const auto result = cs2::CommitViewAngles(request.addresses.angles, {current.pitch, current.yaw, 0},
+                                                      {-current.pitch, NormalizeYaw(current.yaw + turn)});
+            return result == S_OK || result == HRESULT_FROM_WIN32(ERROR_RETRY);
         }
     };
     void Run() noexcept {
@@ -105,7 +152,7 @@ class Runtime {
             last = r;
             sample = {};
             const auto keys = bridge_->AssistKeys();
-            const bool configured = r.options.shoot || r.options.jumper || r.options.strafer;
+            const bool configured = r.options.shoot || r.options.jumper || r.options.strafer || r.options.autoPistol;
             const bool controlsSafe = GetTickCount64() <= r.deadline && Allowed(r) && !keys.textInput;
             bool active = r.enabled && configured && controlsSafe;
             if (active && !precision)
@@ -116,18 +163,21 @@ class Runtime {
             }
             if (active) {
                 cs2::LocalMemory local;
-                active = cs2::ReadAssistSample({&local, cs2::LocalMemory::Read}, r.addresses, sample);
+                cs2::ReadAssistSample({&local, cs2::LocalMemory::Read}, r.addresses, sample);
             }
             Backend backend{*this, r, sample};
             controller.Step(r.options, sample, keys, FrameSeconds(), active,
-                            r.trackingEnabled && bridge_->BindingHeld(r.trackingKey), backend, controlsSafe);
+                            (r.trackingEnabled && bridge_->BindingHeld(r.trackingKey)) ||
+                                (r.recoilEnabled && sample.shots > 0),
+                            backend, controlsSafe);
             bridge_->SuppressAssistRepeats(controller.SuppressedRepeats());
             {
                 std::scoped_lock lock(mutex_);
                 diagnostics_ = controller.GetStatus();
             }
             std::unique_lock lock(mutex_);
-            wake_.wait_for(lock, std::chrono::milliseconds(active ? 4 : 20), [&] { return stop_.load(); });
+            wake_.wait_for(lock, std::chrono::milliseconds(active && sample.valid ? 4 : 20),
+                           [&] { return stop_.load(); });
         }
         last.deadline = GetTickCount64() + 100;
         Backend backend{*this, last, sample};

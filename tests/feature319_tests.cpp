@@ -48,6 +48,19 @@ int main() {
     tracking::Options profiles;
     for (const auto &gun : WeaponIcons)
         Check(tracking::WeaponGroup(gun.id) != tracking::Group::Default, "every firearm has a group");
+    for (const auto &gun : WeaponIcons)
+        Check(worldvisuals::DropCategory(gun.id) < 5 && worldvisuals::DroppedName(gun.id),
+              "every existing firearm retains a dropped-item category and label");
+    Check(worldvisuals::DropCategory(4) == 0 && worldvisuals::DropCategory(17) == 1 &&
+              worldvisuals::DropCategory(7) == 2 && worldvisuals::DropCategory(9) == 3 &&
+              worldvisuals::DropCategory(25) == 4 && worldvisuals::DropCategory(14) == 4,
+          "pistols, SMGs, rifles, snipers and heavy weapons have distinct groups");
+    for (const auto definition : {31u, 43u, 44u, 45u, 46u, 47u, 48u, 49u, 57u, 42u, 525u})
+        Check(worldvisuals::DropCategory(definition) == 5 && worldvisuals::DroppedName(definition),
+              "utility and knife definitions have bounded names and the utility group");
+    Check(worldvisuals::DropCategory(0) == worldvisuals::DropGroupCount &&
+              worldvisuals::DropCategory(999) == worldvisuals::DropGroupCount && !worldvisuals::DroppedName(999),
+          "unknown definitions are not misidentified as another category");
     profiles.groups[3] = {1, 1, 3, 40};
     profiles.groups[4] = {1, 0, 1, 80};
     Check(tracking::Resolve(base, profiles, 7, true).fovDegrees == 3, "rifle FOV switches");
@@ -113,8 +126,18 @@ int main() {
     f.Put(gun + offsets::Collision, collision);
     f.Put(collision + offsets::Mins, Vector3{-10, -2, -1});
     f.Put(collision + offsets::Maxs, Vector3{10, 2, 1});
+    f.Put(gun + offsets::Clip1, 17);
     worldvisuals::DroppedWeapon drop;
     Check(ReadDroppedWeapon(f.memory, Fixture::list, 0x80002, drop) && drop.bounds, "unowned firearm read with bounds");
+    Check(drop.ammo == 17, "dropped firearm captures magazine ammunition");
+    f.Put(gun + offsets::Clip1, -1);
+    Check(ReadDroppedWeapon(f.memory, Fixture::list, 0x80002, drop) && drop.ammo == -1,
+          "unknown ammo preserves weapon without fabricated empty magazine");
+    f.Put(gun + offsets::Clip1, 0);
+    Check(ReadDroppedWeapon(f.memory, Fixture::list, 0x80002, drop) && drop.ammo == 0,
+          "empty magazine remains a known zero");
+    f.Put(gun + offsets::Clip1, 251);
+    Check(ReadDroppedWeapon(f.memory, Fixture::list, 0x80002, drop) && drop.ammo == -1, "implausible ammo ignored");
     Check(Near(drop.corners[0].x, 102) && Near(drop.corners[0].y, 190), "bounds rotate with weapon yaw");
     DroppedReader reader;
     worldvisuals::Drops drops;
@@ -130,10 +153,54 @@ int main() {
     f.Put(Fixture::chunk + 2 * offsets::EntityStride + 0x10, 0x100002u);
     Check(!ReadDroppedWeapon(f.memory, Fixture::list, 0x80002, drop), "recycled dropped handle rejected");
     f.Put(Fixture::chunk + 2 * offsets::EntityStride + 0x10, 0x80002u);
+    const auto utility = Fixture::base + 0x90000, utilityScene = Fixture::base + 0xa0000;
+    f.Entity(3, utility, "weapon_smokegrenade");
+    f.Put(utility + offsets::AttributeManager + offsets::ItemView + offsets::ItemDefinition, std::uint16_t{45});
+    f.Put(utility + offsets::EntityOwner, 0xffffffffu);
+    f.Put(utility + offsets::SceneNode, utilityScene);
+    f.Put(utilityScene + offsets::Origin, Vector3{20, 30, 10});
+    f.Put(utilityScene + offsets::Dormant, std::uint8_t{0});
+    reader.Reset();
+    Check(reader.Update(f.memory, Fixture::list, 10.1, drops) && drops.count == 2,
+          "discovery includes an unowned utility item without needing a firearm icon");
+    Check(ReadDroppedWeapon(f.memory, Fixture::list, 0x80003, drop) && drop.definition == 45,
+          "utility item reader preserves the actual definition");
+    f.Put(utility + offsets::EntityOwner, 0x80001u);
+    Check(!ReadDroppedWeapon(f.memory, Fixture::list, 0x80003, drop), "held utility remains excluded");
+    reader.Update(f.memory, Fixture::list, 10.11, drops);
+    Check(drops.count == 1, "utility pickup disappears immediately from the cached snapshot");
+    f.Put(utility + offsets::EntityOwner, 0xffffffffu);
+    f.Put(utilityScene + offsets::Dormant, std::uint8_t{1});
+    Check(!ReadDroppedWeapon(f.memory, Fixture::list, 0x80003, drop), "dormant utility cannot render");
+    f.Put(utilityScene + offsets::Dormant, std::uint8_t{0});
+    f.Put(utility + offsets::AttributeManager + offsets::ItemView + offsets::ItemDefinition, std::uint16_t{999});
+    Check(!ReadDroppedWeapon(f.memory, Fixture::list, 0x80003, drop), "unknown utility definitions are rejected");
     f.Put(pawn + offsets::Team, std::uint8_t{3});
     f.Put(pawn + offsets::SceneNode, pawnScene);
     f.Put(pawnScene + offsets::Origin, Vector3{0, 0, .5f});
     f.Put(pawnScene + offsets::Dormant, std::uint8_t{0});
+    f.Entity(1, pawn, "c_cs_player_for_precache");
+    f.Put(pawn + offsets::MovementServices, service);
+    f.Put(service + offsets::MovementStepSide, 0);
+    f.Put(pawn + offsets::MovementFlags, 1u);
+    f.Put(pawn + offsets::AbsVelocity, Vector3{120, 0, 0});
+    FrameSnapshot stepFrame;
+    stepFrame.entityCount = 1;
+    stepFrame.entities[0].id = 1;
+    stepFrame.entities[0].valid = true;
+    stepFrame.entities[0].health = 100;
+    FootstepReader phaseReader;
+    phaseReader.Update(f.memory, Fixture::list, stepFrame, 10);
+    Check(phaseReader.Count() == 0, "first movement sample must not fabricate a step");
+    f.Put(service + offsets::MovementStepSide, 1);
+    phaseReader.Update(f.memory, Fixture::list, stepFrame, 10.1);
+    Check(phaseReader.Count() == 1, "verified step-side transition emits one anchored ring");
+    phaseReader.Update(f.memory, Fixture::list, stepFrame, 10.2);
+    Check(phaseReader.Count() == 1, "unchanged step phase never repeats rings");
+    f.Put(service + offsets::MovementStepSide, 0);
+    f.Put(pawn + offsets::MovementFlags, 0u);
+    phaseReader.Update(f.memory, Fixture::list, stepFrame, 10.3);
+    Check(phaseReader.Count() == 1, "airborne phase changes cannot emit ground steps");
     worldvisuals::Footstep step;
     Check(ReadFootstep(f.memory, Fixture::list, pawn, 10, step) && step.handle == 0x80001,
           "footstep resolves pawn identity");
@@ -142,7 +209,78 @@ int main() {
     worldvisuals::Footsteps steps;
     step = {0x80001, 3, {0, 0, .5f}, 10};
     Check(steps.Add(step) && !steps.Add(step), "duplicate footstep callbacks merge");
+    auto earlierDuplicate = step;
+    earlierDuplicate.time -= .04;
+    Check(!steps.Add(earlierDuplicate) && steps.Events().count == 1,
+          "older fallback and newer native callback deduplicate symmetrically");
+    {
+        worldvisuals::Footsteps native, expired;
+        native.Add({500, 3, {1, 0, 0}, 99.95});
+        for (unsigned i = 0; i < 128; ++i)
+            expired.Add({1000 + i, 3, {}, 50 + i * .1});
+        const auto merged = worldvisuals::Footsteps::MergeLive(native, expired, 100, 1);
+        Check(merged.Events().count == 1 && merged.Events()[0].handle == 500,
+              "full expired fallback history cannot evict the current native footstep");
+    }
+    {
+        worldvisuals::Footsteps even, odd;
+        for (unsigned i = 0; i < 256; ++i)
+            (i % 2 ? odd : even).Add({1000 + i, 3, {}, 99 + i * .003});
+        const auto merged = worldvisuals::Footsteps::MergeLive(even, odd, 100, 2);
+        bool chronological = true;
+        for (std::size_t i = 1; i < merged.Events().count; ++i)
+            chronological &= merged.Events()[i].time >= merged.Events()[i - 1].time;
+        Check(merged.Events().count == 128 && merged.Events()[0].handle == 1128 &&
+                  merged.Events()[127].handle == 1255 && chronological,
+              "merged histories preserve the newest 128 events in chronological order");
+        Check(!even.Add({999, 3, {}, 10}) && even.Events()[0].handle == 1000,
+              "late expired insertion cannot evict a newer event from a full history");
+        worldvisuals::Footsteps future;
+        future.Add({2000, 3, {}, 101});
+        Check(worldvisuals::Footsteps::MergeLive(future, {}, 100, 2).Events().count == 0,
+              "future timestamps are excluded from merged live footsteps");
+    }
     worldvisuals::Options options;
+    Check(worldvisuals::Valid(options) && worldvisuals::ResolveDrop(options, 7).enabled &&
+              !worldvisuals::ResolveDrop(options, 45).enabled,
+          "default groups preserve firearm visibility and leave utility opt-in");
+    options.dropRange = 85;
+    options.dropColor = {.2f, .4f, .6f, .8f};
+    auto inherited = worldvisuals::ResolveDrop(options, 7);
+    Check(inherited.icons && !inherited.names && inherited.range == 85 && inherited.color.g == .4f,
+          "uncustomized groups inherit the existing global display, distance and color");
+    options.dropGroups[2].custom = 1;
+    options.dropGroups[2].display = 2;
+    options.dropGroups[2].range = 25;
+    options.dropGroups[2].color = {.8f, .6f, .4f, .2f};
+    auto rifleStyle = worldvisuals::ResolveDrop(options, 7);
+    Check(rifleStyle.enabled && rifleStyle.icons && rifleStyle.names && rifleStyle.range == 25 &&
+              rifleStyle.color.a == .2f && worldvisuals::ResolveDrop(options, 4).range == 85,
+          "custom rifle display, range and color do not change other groups");
+    options.dropGroups[2].enabled = 0;
+    Check(!worldvisuals::ResolveDrop(options, 7).enabled && worldvisuals::ResolveDrop(options, 4).enabled,
+          "a disabled group filters only that category");
+    options.dropGroups[5].enabled = 1;
+    Check(worldvisuals::ResolveDrop(options, 49).enabled, "utility category can be enabled independently");
+    options.dropped = 0;
+    Check(!worldvisuals::ResolveDrop(options, 4).enabled && !worldvisuals::ResolveDrop(options, 49).enabled,
+          "the master dropped switch overrides all category switches");
+    options = {};
+    for (int field = 0; field < 5; ++field) {
+        auto invalidGroup = options;
+        auto &group = invalidGroup.dropGroups[2];
+        if (field == 0)
+            group.enabled = 2;
+        if (field == 1)
+            group.custom = 2;
+        if (field == 2)
+            group.display = 4;
+        if (field == 3)
+            group.range = std::numeric_limits<float>::quiet_NaN();
+        if (field == 4)
+            group.color.a = 1.1f;
+        Check(!worldvisuals::Valid(invalidGroup), "invalid category configuration is rejected");
+    }
     options.footRadius = .4f;
     options.dropIcons = 0;
     options.dropNames = 1;
@@ -191,6 +329,54 @@ int main() {
     const auto after = draw.VtxBuffer.Size;
     worldvisuals::Draw(draw, io.Fonts->Fonts[0], {}, frame, frame.viewport, config, options, {}, drops, 11);
     Check(draw.VtxBuffer.Size == after, "stale dropped snapshots disappear");
+    options.footsteps = 0;
+    frame.cameraOrigin = {0, 0, -20};
+    options.dropGroups[2].custom = 1;
+    options.dropGroups[2].range = 5;
+    auto groupBefore = draw.VtxBuffer.Size;
+    worldvisuals::Draw(draw, io.Fonts->Fonts[0], {}, frame, frame.viewport, config, options, {}, drops, 10.1);
+    Check(draw.VtxBuffer.Size == groupBefore, "short rifle range suppresses every part of its dropped overlay");
+    options.dropGroups[2].range = 60;
+    options.dropGroups[2].display = 1;
+    options.dropGroups[2].color = {.7f, .2f, .3f, 1};
+    options.dropBoxes = options.dropDistance = 0;
+    worldvisuals::Draw(draw, io.Fonts->Fonts[0], {}, frame, frame.viewport, config, options, {}, drops, 10.1);
+    const auto nameCount = draw.VtxBuffer.Size - groupBefore;
+    Check(nameCount > 0, "custom name-only dropped display emits its label");
+    bool categoryColor = false;
+    for (int i = groupBefore; i < draw.VtxBuffer.Size; ++i)
+        categoryColor |= draw.VtxBuffer[i].col == flight::Pack(options.dropGroups[2].color, config.opacity);
+    Check(categoryColor, "custom category color reaches rendered label vertices");
+    groupBefore = draw.VtxBuffer.Size;
+    options.dropGroups[2].display = 3;
+    worldvisuals::Draw(draw, io.Fonts->Fonts[0], {}, frame, frame.viewport, config, options, {}, drops, 10.1);
+    Check(draw.VtxBuffer.Size == groupBefore, "none display emits no icon or name when bounds and distance are off");
+    options.dropAmmo = 1;
+    drops.values[0].ammo = 17;
+    worldvisuals::Draw(draw, io.Fonts->Fonts[0], {}, frame, frame.viewport, config, options, {}, drops, 10.1);
+    Check(draw.VtxBuffer.Size > groupBefore, "ammo-only mode emits real magazine label");
+    options.dropAmmo = 0;
+    groupBefore = draw.VtxBuffer.Size;
+    options.dropGroups[2].display = 2;
+    worldvisuals::Draw(draw, io.Fonts->Fonts[0], {}, frame, frame.viewport, config, options, {}, drops, 10.1);
+    Check(draw.VtxBuffer.Size - groupBefore == nameCount,
+          "missing icon atlas falls back to one label without duplicating text");
+    groupBefore = draw.VtxBuffer.Size;
+    options.dropGroups[2].enabled = 0;
+    worldvisuals::Draw(draw, io.Fonts->Fonts[0], {}, frame, frame.viewport, config, options, {}, drops, 10.1);
+    Check(draw.VtxBuffer.Size == groupBefore, "disabled category emits no dropped geometry");
+    drops.values[0].definition = 45;
+    worldvisuals::Draw(draw, io.Fonts->Fonts[0], {}, frame, frame.viewport, config, options, {}, drops, 10.1);
+    Check(draw.VtxBuffer.Size == groupBefore, "utility remains hidden under its preserved default");
+    options.dropGroups[5].enabled = 1;
+    options.dropIcons = 1;
+    options.dropNames = 0;
+    worldvisuals::Draw(draw, io.Fonts->Fonts[0], {}, frame, frame.viewport, config, options, {}, drops, 10.1);
+    Check(draw.VtxBuffer.Size > groupBefore, "enabled utility icon mode gets a readable name fallback");
+    groupBefore = draw.VtxBuffer.Size;
+    drops.time = std::numeric_limits<double>::quiet_NaN();
+    worldvisuals::Draw(draw, io.Fonts->Fonts[0], {}, frame, frame.viewport, config, options, {}, drops, 10.1);
+    Check(draw.VtxBuffer.Size == groupBefore, "invalid dropped snapshot time emits no geometry");
     for (const auto &v : draw.VtxBuffer)
         Check(std::isfinite(v.pos.x) && std::isfinite(v.pos.y), "world vertices finite");
     ImGui::EndFrame();

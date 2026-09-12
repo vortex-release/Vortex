@@ -4,13 +4,15 @@
 #include "weapon_icons.hpp"
 namespace awareness::worldvisuals {
 inline float DistanceAlpha(Vector3 a, Vector3 b, float range, float units) noexcept {
-    if (!Finite(a) || !Finite(b) || !std::isfinite(units) || units <= 0)
+    if (!Finite(a) || !Finite(b) || !std::isfinite(units) || units <= 0 || !std::isfinite(range) || range <= 0)
         return 0;
     const float meters = Distance(a, b) / units;
     return std::clamp((range - meters) / std::max(5.f, range * .2f), 0.f, 1.f);
 }
 inline void Draw(ImDrawList &d, ImFont *font, ImTextureRef atlas, const FrameSnapshot &frame, Viewport viewport,
                  const Configuration &c, const Options &o, const Footsteps &steps, const Drops &drops, double now) {
+    if (!std::isfinite(now))
+        return;
     if (o.footsteps) {
         unsigned emitted{};
         const auto &events = steps.Events();
@@ -44,12 +46,15 @@ inline void Draw(ImDrawList &d, ImFont *font, ImTextureRef atlas, const FrameSna
             }
         }
     }
-    if (!o.dropped || now < drops.time || now - drops.time > .25)
+    if (!o.dropped || !std::isfinite(drops.time) || now < drops.time || now - drops.time > .25)
         return;
     for (unsigned i = 0; i < drops.count && i < drops.values.size(); ++i) {
         const auto &weapon = drops.values[i];
+        const auto style = ResolveDrop(o, weapon.definition);
+        if (!style.enabled)
+            continue;
         const float alpha =
-            DistanceAlpha(weapon.position, frame.cameraOrigin, o.dropRange, c.worldUnitsPerMeter) * c.opacity;
+            DistanceAlpha(weapon.position, frame.cameraOrigin, style.range, c.worldUnitsPerMeter) * c.opacity;
         if (alpha <= 0)
             continue;
         if (o.dropBoxes && weapon.bounds)
@@ -59,25 +64,34 @@ inline void Draw(ImDrawList &d, ImFont *font, ImTextureRef atlas, const FrameSna
                         ImVec2 p, q;
                         if (flight::ScreenLine(weapon.corners[corner], weapon.corners[corner | axis],
                                                frame.viewProjection, viewport, p, q))
-                            d.AddLine(p, q, flight::Pack(o.dropColor, alpha), o.dropWidth);
+                            d.AddLine(p, q, flight::Pack(style.color, alpha), o.dropWidth);
                     }
         Vector2 screen;
         if (!WorldToScreen(weapon.position, frame.viewProjection, viewport, screen))
             continue;
         ImVec2 at{screen.x, screen.y + 8};
-        if (o.dropIcons &&
-            DrawWeaponIcon(&d, atlas, weapon.definition, {at.x - 22, at.y}, {44, 18}, flight::Pack(o.dropColor, alpha)))
+        const bool iconDrawn = style.icons && DrawWeaponIcon(&d, atlas, weapon.definition, {at.x - 22, at.y}, {44, 18},
+                                                             flight::Pack(style.color, alpha));
+        if (iconDrawn)
             at.y += 20;
-        if (o.dropNames)
-            if (const auto *icon = FindWeaponIcon(weapon.definition)) {
-                combat::Text(d, font, 13, at, o.dropColor, alpha, icon->name, true);
+        // Utility has no entries in the firearm atlas. A name is a readable fallback,
+        // also covering a temporarily unavailable atlas without hiding an enabled item.
+        if (style.names || (style.icons && !iconDrawn))
+            if (const auto *name = DroppedName(weapon.definition)) {
+                combat::Text(d, font, 13, at, style.color, alpha, name, true);
                 at.y += 16;
             }
+        if (o.dropAmmo && DropCategory(weapon.definition) < 5 && weapon.ammo >= 0 && weapon.ammo <= 250) {
+            char text[24]{};
+            std::snprintf(text, sizeof(text), "%d rounds", weapon.ammo);
+            combat::Text(d, font, 11, at, style.color, alpha, text, true);
+            at.y += 14;
+        }
         if (o.dropDistance) {
             char text[24]{};
             std::snprintf(text, sizeof(text), "%.0f m",
                           Distance(weapon.position, frame.cameraOrigin) / c.worldUnitsPerMeter);
-            combat::Text(d, font, 11, at, o.dropColor, alpha, text, true);
+            combat::Text(d, font, 11, at, style.color, alpha, text, true);
         }
     }
 }

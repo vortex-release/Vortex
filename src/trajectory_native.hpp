@@ -1,10 +1,18 @@
 #pragma once
 #include "settings.hpp"
+#include "deferred_log.hpp"
 #include "frame_clock.hpp"
 #include <awareness/Trajectories.hpp>
 #include <Windows.h>
 namespace awareness::cs2 {
+struct LineupSample {
+    Vector3 feet{}, eye{}, angles{};
+    std::uint32_t weapon{};
+    double time{};
+    bool valid{};
+};
 struct FlightSnapshot {
+    LineupSample lineup;
     flight::Prediction prediction;
     flight::Tracers tracers;
     combat::Feedback feedback;
@@ -31,5 +39,5 @@ HRESULT StopTrajectories() noexcept;
 void ConfigureTrajectories(const VisualOptions &, bool fresh, bool recoilActive) noexcept;
 void RefreshTrajectoryInputs() noexcept;
 void PauseTrajectories() noexcept;
-void CopyTrajectories(FlightSnapshot &) noexcept;
+void CopyTrajectories(FlightSnapshot &, DeferredLog *log = nullptr) noexcept;
 } // namespace awareness::cs2

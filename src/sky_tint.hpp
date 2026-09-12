@@ -17,7 +17,7 @@ class SkyTint {
     std::array<Entry, 16> entries_{};
     std::uintptr_t list_{};
     unsigned cursor_{1};
-    double nextScan_{};
+    double nextScan_{}, previous_{};
     static std::uintptr_t Offset(unsigned i) { return i < 3 ? offsets::SkyTint + i : offsets::SkyBrightness; }
     static std::uint8_t Size(unsigned i) { return i < 3 ? 1 : 4; }
     static bool Read(const GlowAccess &a, const Entry &e, unsigned i, std::uint32_t &out) {
@@ -103,7 +103,7 @@ class SkyTint {
         for (auto &e : entries_)
             done = Restore(a, e) && done;
         cursor_ = 1;
-        nextScan_ = 0;
+        nextScan_ = previous_ = 0;
         list_ = 0;
         return done;
     }
@@ -121,24 +121,42 @@ class SkyTint {
         for (auto &e : entries_)
             if (e.owner.pawn && !SameGlowEntity(a.memory, e.owner))
                 e = {};
-        // Discover at most 128 entries per worker sample; never scan on Present.
+        if (now < previous_) {
+            cursor_ = 1;
+            nextScan_ = 0;
+        }
+        previous_ = now;
+        // HighestEntity excludes client-only entities, including live env_sky records.
+        // Walk allocated chunks with a fixed slot budget on the worker; sparse gaps
+        // cost only one pointer read per missing chunk and no per-slot probing.
         if (now >= nextScan_) {
-            std::int32_t highest{};
-            if (a.memory.Field(list, offsets::HighestEntity, highest) && highest > 0) {
-                const unsigned end = static_cast<unsigned>(std::min(highest, 32767));
-                for (unsigned n = 0; n < 128 && cursor_ <= end; ++n, ++cursor_) {
-                    const auto entity = EntityAt(a.memory, list, cursor_);
+            unsigned budget{};
+            while (cursor_ <= offsets::EntryMask && budget < 128) {
+                std::uintptr_t chunk{};
+                const auto end = (cursor_ | 511u) + 1;
+                if (!a.memory.Field(list, offsets::EntityTable + sizeof(std::uintptr_t) * (cursor_ >> 9), chunk) ||
+                    !chunk) {
+                    cursor_ = end;
+                    continue;
+                }
+                while (cursor_ < end && budget < 128) {
+                    const auto index = cursor_++;
+                    ++budget;
+                    std::uintptr_t entity{};
+                    if (!a.memory.Field(chunk, offsets::EntityStride * (index & 511), entity) || !entity)
+                        continue;
                     GlowIdentity owner{list, entity};
                     std::uintptr_t name{};
-                    std::array<char, 16> type{};
-                    if (!entity || !a.memory.Field(entity, offsets::Identity, owner.identity) ||
-                        !a.memory.Field(owner.identity, 0x10, owner.handle) ||
+                    std::array<char, sizeof("env_sky")> type{};
+                    if (!a.memory.Field(entity, offsets::Identity, owner.identity) ||
+                        !a.memory.Field(owner.identity, 0x10, owner.handle) || owner.handle == 0xffffffff ||
+                        (owner.handle & offsets::EntryMask) != index ||
                         !a.memory.Field(owner.identity, offsets::DesignerName, name) || !a.memory.Read(name, type) ||
                         std::memcmp(type.data(), "env_sky", sizeof("env_sky")) || !SameGlowEntity(a.memory, owner))
                         continue;
                     bool found = false;
                     for (const auto &e : entries_)
-                        found |= e.owner.pawn == entity;
+                        found |= e.owner.list == list && e.owner.pawn == entity && e.owner.handle == owner.handle;
                     if (!found)
                         for (auto &e : entries_)
                             if (!e.owner.pawn) {
@@ -146,10 +164,10 @@ class SkyTint {
                                 break;
                             }
                 }
-                if (cursor_ > end) {
-                    cursor_ = 1;
-                    nextScan_ = now + 1;
-                }
+            }
+            if (cursor_ > offsets::EntryMask) {
+                cursor_ = 1;
+                nextScan_ = now + 1;
             }
         }
         for (auto &entry : entries_)

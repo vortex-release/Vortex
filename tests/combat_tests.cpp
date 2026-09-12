@@ -53,6 +53,18 @@ int main() {
     invalid = options;
     invalid.weapons[0].curve = 3;
     Check(!combat::Valid(invalid), "reject invalid response");
+    options.recoil = 1;
+    Check(options.EnabledFor(7) && options.EnabledFor(16) && options.EnabledFor(17) && !options.EnabledFor(1) &&
+              !options.EnabledFor(9) && !options.EnabledFor(25) && !options.EnabledFor(42),
+          "recoil defaults allow rifles and SMGs only");
+    options.weapons[combat::WeaponProfile(7)].activation = 2;
+    options.weapons[combat::WeaponProfile(1)].activation = 1;
+    Check(!options.EnabledFor(7) && options.EnabledFor(1), "individual recoil activation overrides weapon group");
+    options.recoil = 0;
+    Check(!options.EnabledFor(1), "global recoil off overrides explicit per-gun enable");
+    invalid = options;
+    invalid.weapons[1].activation = 3;
+    Check(!combat::Valid(invalid), "invalid per-weapon recoil activation rejected");
     combat::Recoil filter;
     combat::RecoilProfile profile;
     profile.smoothing = 0;
@@ -83,6 +95,28 @@ int main() {
         total = total + filter.Update(sample, profile, .016f, true);
     Check(std::abs(total.x - 3) < .01f && std::abs(total.y + 2) < .01f, "smoothed recoil converges without overshoot");
     Check(filter.Update(sample, profile, .016f, false).x == 0, "focus/menu gating resets compensation");
+    sample.valid = true;
+    sample.shots = 3;
+    sample.punch = {10, 2, 0};
+    Check(filter.Update(sample, profile, 1, true).x == 0,
+          "long stalls clear pending recoil instead of applying an accumulated camera jump");
+    filter.Reset();
+    profile.smoothing = .1f;
+    sample = {1, 4, 7, 0, {}, 0, 10, 10, true};
+    filter.Update(sample, profile, .004f, true);
+    sample.shots = 1;
+    sample.punch = {5, 2, 0};
+    sample.lastShot = sample.gameTime = 10.01f;
+    const auto partial = filter.Update(sample, profile, .004f, true);
+    Check(partial.x > 0 && partial.x < 5, "smooth recoil leaves a bounded pending correction");
+    sample.weaponHandle = 6;
+    sample.weapon = 17;
+    Check(filter.Update(sample, profile, .004f, true).x == 0 && filter.Update(sample, profile, .004f, true).x == 0,
+          "weapon change clears unconsumed correction before another firearm can inherit it");
+    sample.owner = 2;
+    sample.punch = {9, 3, 0};
+    Check(filter.Update(sample, profile, .004f, true).x == 0,
+          "respawn ownership change cannot replay correction from the previous pawn");
     combat::Feedback feedback;
     for (int i = 0; i < 40; ++i)
         feedback.Add(2, {0, 0, .5f}, i + 1, false, i);
@@ -194,13 +228,14 @@ int main() {
     history->Add(2, pose, 22.04, .05f);
     history->End();
     combat::BuildReplay(*history, 22.04, .05f, *replayFrame);
-    Check(replayFrame->actors[0].ready && replayFrame->actors[0].movement > .99f,
+    Check(replayFrame->actors[0].ready && replayFrame->actors[0].movement > .4f,
           "nearby historical pose appears immediately when movement resumes");
     history->Begin();
     history->Add(2, pose, 22.08, .05f);
     history->End();
     combat::BuildReplay(*history, 22.08, .05f, *replayFrame);
-    Check(!replayFrame->actors[0].ready, "replay hides after root movement stops");
+    Check(replayFrame->actors[0].ready && replayFrame->actors[0].movement < .6f,
+          "replay fades smoothly after root movement stops instead of popping away");
     combat::BuildReplay(*history, 23, 1, *replayFrame);
     Check(!replayFrame->count, "stale replay actors disappear");
     Fixture f;
@@ -231,6 +266,22 @@ int main() {
     Check(!ReadBomb(f.memory, Fixture::list, bomb, pawn, 120, 0x80001, b), "finished bomb disappears");
     f.Put(bomb + offsets::BombDefused, std::uint8_t{});
     Check(!ReadBomb(f.memory, Fixture::list, bomb, pawn, 120, 0x100001, b), "reused bomb identity rejected");
+    f.Put(fire + offsets::FireStartTick, 118 * 64);
+    f.Put(fire + offsets::FireLifetime, 7.f);
+    f.Put(smoke + offsets::SmokeStartTick, 110 * 64);
+    const auto fireTimer = ReadAreaTimer(f.memory, fire, combat::AreaType::Fire, 120);
+    const auto smokeTimer = ReadAreaTimer(f.memory, smoke, combat::AreaType::Smoke, 120);
+    Check(fireTimer.Valid() && fireTimer.remaining == 5 && fireTimer.duration == 7 && !fireTimer.estimated,
+          "fire countdown follows the engine start and lifetime");
+    Check(smokeTimer.Valid() && smokeTimer.remaining == 8 && smokeTimer.estimated,
+          "smoke timer clearly marks its standard lifetime estimate");
+    Check(!ReadAreaTimer(f.memory, fire, combat::AreaType::Fire, 100).Valid() &&
+              !ReadAreaTimer(f.memory, fire, combat::AreaType::Fire, 125).Valid() &&
+              !ReadAreaTimer(f.memory, fire, combat::AreaType::Fire, std::numeric_limits<float>::quiet_NaN()).Valid(),
+          "future, expired and unavailable clocks never fabricate countdowns");
+    f.Put(fire + offsets::FireLifetime, std::numeric_limits<float>::infinity());
+    Check(!ReadAreaTimer(f.memory, fire, combat::AreaType::Fire, 120).Valid(), "corrupt lifetime rejected");
+    f.Put(fire + offsets::FireLifetime, 7.f);
     f.Put(fire + offsets::FireCount, 2);
     std::array<Vector3, 64> spots{};
     spots[0] = {100, 200, 0};
@@ -266,6 +317,10 @@ int main() {
                                        [](auto &a) { return a.type == combat::AreaType::Fire; });
     Check(fireArea != world.areas.begin() + world.areaCount && fireArea->radius == 45 && fireArea->center.x == 120,
           "fire proxy derived from live flame positions");
+    Check(fireArea->timer.Valid() && fireArea->timer.remaining == 5, "world publication carries native fire countdown");
+    reader.Update(f.memory, Fixture::list, pawn, 140, 1.002, world);
+    Check(world.areaCount == 2 && !world.areas[0].timer.Valid() && !world.areas[1].timer.Valid(),
+          "expired timer never hides still-active fire or smoke footprints");
     active[0] = 0xff;
     active[1] = 2;
     f.Put(fire + offsets::FireBurning, active);
@@ -422,6 +477,67 @@ int main() {
     before = draw.VtxBuffer.Size;
     combat::AreaShape(draw, area, options.fireColor, frame.viewProjection, frame.viewport, 1, 0, false, false);
     Check(draw.VtxBuffer.Size == before, "disabled area fill and border skip all geometry");
+    options = {};
+    options.utilityTimers = 1;
+    world.Clear();
+    world.areaCount = 1;
+    world.areas[0] = {1, combat::AreaType::Fire, {0, 0, .5f}, .3f, .2f};
+    world.areas[0].timer = {5, 7, false};
+    before = draw.VtxBuffer.Size;
+    Check(combat::DrawUtilityTimers(draw, io.Fonts->Fonts[0], frame, frame.viewport, config, options, world) == 1 &&
+              draw.VtxBuffer.Size > before,
+          "countdown renders while area fill is off");
+    world.areas[0].timer.remaining = 0;
+    before = draw.VtxBuffer.Size;
+    Check(!combat::DrawUtilityTimers(draw, io.Fonts->Fonts[0], frame, frame.viewport, config, options, world) &&
+              draw.VtxBuffer.Size == before,
+          "expired countdown emits no geometry");
+    world.areas[0].timer.remaining = 5;
+    options.timerFire = 0;
+    Check(!combat::DrawUtilityTimers(draw, io.Fonts->Fonts[0], frame, frame.viewport, config, options, world),
+          "fire timer can be independently disabled");
+    options.timerFire = 1;
+    frame.cameraOrigin = {1000, 0, 0};
+    Check(!combat::DrawUtilityTimers(draw, io.Fonts->Fonts[0], frame, frame.viewport, config, options, world),
+          "utility timer range applies before projection");
+    frame.cameraOrigin = {};
+    world.areas[0].center.z = -.5f;
+    Check(!combat::DrawUtilityTimers(draw, io.Fonts->Fonts[0], frame, frame.viewport, config, options, world),
+          "behind-camera timer emits no giant marker");
+    options = {};
+    options.hitLog = 1;
+    options.hitLogRows = 2;
+    feedback.Clear();
+    char captured[] = "Rival\nPlayer";
+    feedback.Add(8, {0, 0, .5f}, 42, true, 50, captured);
+    captured[0] = 'X';
+    Check(!std::strcmp(feedback.hits[0].name, "Rival Player"), "hit name is frozen and control characters removed");
+    const std::string longName = std::string(62, 'a') + "\xE7\x8C\xAB";
+    feedback.Add(9, {0, 0, .5f}, 10, false, 50.1, longName);
+    Check(std::strlen(feedback.hits[1].name) == 62, "truncating player name retains complete UTF8 characters");
+    feedback.Add(10, {0, 0, .5f}, 5, false, 50.2, "Third");
+    Check(combat::DrawHitFeed(draw, io.Fonts->Fonts[0], feedback, frame.viewport, options, 1, 50.5) == 2,
+          "hit feed renders only configured newest rows without world markers");
+    options.hitLogY = 1;
+    Check(combat::DrawHitFeed(draw, io.Fonts->Fonts[0], feedback, frame.viewport, options, 1, 50.5) == 2,
+          "bottom placement preserves the entire feed block");
+    options.hitLogScale = 1.5f;
+    Check(!combat::DrawHitFeed(draw, io.Fonts->Fonts[0], feedback, {0, 0, 800, 48}, options, 1, 50.5) &&
+              !combat::DrawHitFeed(draw, io.Fonts->Fonts[0], feedback, {0, 0, 64, 600}, options, 1, 50.5),
+          "small viewports skip feed without inverted clamp or clipping bounds");
+    before = draw.VtxBuffer.Size;
+    Check(!combat::DrawHitFeed(draw, io.Fonts->Fonts[0], feedback, frame.viewport, options, 1, 60) &&
+              draw.VtxBuffer.Size == before,
+          "hit feed expires independently");
+    Check(combat::HitLogOpacity(-1, 3) == 0 && combat::HitLogOpacity(4, 3) == 0 && combat::HitLogOpacity(.2, 3) == 1 &&
+              combat::HitLogOpacity(2.9, 3) < .5f &&
+              combat::HitLogOpacity(std::numeric_limits<double>::quiet_NaN(), 3) == 0,
+          "hit feed animation rejects invalid clocks and fades at expiry");
+    options.hitLogRows = 9;
+    Check(!combat::Valid(options), "unbounded feed capacity rejected");
+    options = {};
+    options.timerScale = std::numeric_limits<float>::quiet_NaN();
+    Check(!combat::Valid(options), "nonfinite timer geometry rejected");
     bool finite = true;
     for (const auto &v : draw.VtxBuffer)
         finite &= std::isfinite(v.pos.x) && std::isfinite(v.pos.y);

@@ -3,6 +3,7 @@
 #include "configuration.hpp"
 #include "entity_filter.hpp"
 #include "trajectory_draw.hpp"
+#include "ui_icons.hpp"
 #include <cstdio>
 namespace awareness::combat {
 inline void Text(ImDrawList &d, ImFont *font, float size, ImVec2 p, Color color, float alpha, const char *text,
@@ -169,9 +170,110 @@ inline bool DrawHitMarker(ImDrawList &draw, const Hit &hit, const Matrix4x4 &mat
     draw.PopClipRect();
     return true;
 }
+inline float HitLogOpacity(double age, float lifetime) noexcept {
+    if (!std::isfinite(age) || !std::isfinite(lifetime) || lifetime <= 0 || age < 0 || age >= lifetime)
+        return 0;
+    const float enter = static_cast<float>(std::min(age / .12, 1.));
+    const float leave = static_cast<float>(std::min((lifetime - age) / .35, 1.));
+    return enter * enter * (3 - 2 * enter) * leave * leave * (3 - 2 * leave);
+}
+inline unsigned DrawHitFeed(ImDrawList &draw, ImFont *font, const Feedback &feedback, Viewport v, const Options &o,
+                            float opacity, double now) {
+    if (!o.hitLog || !font || !Valid(v) || v.width < 64 || v.height < 48)
+        return 0;
+    const float scale = o.hitLogScale, rowHeight = 32 * scale, gap = 4 * scale;
+    const float width = std::min(250 * scale, v.width - 16);
+    if (v.height < rowHeight + 16 || width < 144 * scale)
+        return 0;
+    std::array<const Hit *, 8> visible{};
+    unsigned count{};
+    const auto capacity =
+        std::min({o.hitLogRows, 8u, static_cast<unsigned>((v.height - 16 + gap) / (rowHeight + gap))});
+    for (std::size_t i = feedback.hits.count; i > 0 && count < capacity; --i)
+        if (HitLogOpacity(now - feedback.hits[i - 1].time, o.hitLogDuration) > 0)
+            visible[count++] = &feedback.hits[i - 1];
+    if (!count)
+        return 0;
+    const float blockHeight = count * rowHeight + (count - 1) * gap;
+    const float x = std::clamp(v.x + v.width * o.hitLogX, v.x + 8, v.x + v.width - width - 8);
+    const float y = std::clamp(v.y + v.height * o.hitLogY, v.y + 8, v.y + v.height - blockHeight - 8);
+    unsigned rows{};
+    draw.PushClipRect({v.x, v.y}, {v.x + v.width, v.y + v.height}, true);
+    for (unsigned i = 0; i < count; ++i) {
+        const auto &hit = *visible[i];
+        const double age = now - hit.time;
+        const float alpha = HitLogOpacity(age, o.hitLogDuration) * opacity;
+        if (alpha <= 0)
+            continue;
+        const float top = y + rows * (rowHeight + 4 * scale);
+        if (top + rowHeight > v.y + v.height - 4)
+            break;
+        const float slide = static_cast<float>(std::clamp(1. - age / .16, 0., 1.)) * 8 * scale;
+        const ImVec2 a{x - slide, top}, b{x - slide + width, top + rowHeight};
+        if (o.hitLogBackground) {
+            draw.AddRectFilled(a, b, flight::Pack({.045f, .047f, .06f, .86f}, alpha), 7 * scale);
+            draw.AddRect(a, b, flight::Pack({1, 1, 1, .08f}, alpha), 7 * scale);
+        }
+        const Color color = hit.headshot ? o.damageColor : o.markerColor;
+        vortex::icons::Draw(&draw, vortex::icons::Id::Crosshair, {a.x + 9 * scale, top + 8 * scale}, 16 * scale,
+                            flight::Pack(color, alpha));
+        char amount[32]{};
+        std::snprintf(amount, sizeof(amount), hit.headshot ? "-%d  HS" : "-%d", hit.damage);
+        const float size = 13 * scale;
+        const float amountWidth = font->CalcTextSizeA(size, FLT_MAX, 0, amount).x;
+        Text(draw, font, size, {b.x - amountWidth - 10 * scale, top + 9 * scale}, color, alpha, amount);
+        draw.PushClipRect({a.x + 33 * scale, top}, {b.x - amountWidth - 18 * scale, b.y}, true);
+        Text(draw, font, size, {a.x + 33 * scale, top + 9 * scale}, o.markerColor, alpha,
+             hit.name[0] ? hit.name : "Player");
+        draw.PopClipRect();
+        ++rows;
+    }
+    draw.PopClipRect();
+    return rows;
+}
+inline unsigned DrawUtilityTimers(ImDrawList &draw, ImFont *font, const FrameSnapshot &frame, Viewport v,
+                                  const Configuration &c, const Options &o, const WorldSnapshot &world) {
+    if (!o.utilityTimers || !font || !Valid(v) || !std::isfinite(c.worldUnitsPerMeter) || c.worldUnitsPerMeter <= 0)
+        return 0;
+    unsigned count{};
+    const float scale = o.timerScale, radius = 17 * scale;
+    draw.PushClipRect({v.x, v.y}, {v.x + v.width, v.y + v.height}, true);
+    for (std::size_t i = 0; i < std::min(world.areaCount, world.areas.size()); ++i) {
+        const auto &area = world.areas[i];
+        const bool fire = area.type == AreaType::Fire;
+        if ((!fire && area.type != AreaType::Smoke) || (fire ? !o.timerFire : !o.timerSmoke) || !area.timer.Valid())
+            continue;
+        const float meters = Distance(frame.cameraOrigin, area.center) / c.worldUnitsPerMeter;
+        if (!std::isfinite(meters) || meters > o.timerRange)
+            continue;
+        Vector2 screen;
+        if (!WorldToScreen(area.center, frame.viewProjection, v, screen) || screen.x < v.x + radius ||
+            screen.x > v.x + v.width - radius || screen.y < v.y + radius + 28 * scale ||
+            screen.y > v.y + v.height - radius)
+            continue;
+        const ImVec2 at{screen.x, screen.y - 26 * scale};
+        Color color = fire ? o.fireColor : o.smokeColor;
+        color.a = 1;
+        const float alpha = c.opacity * std::clamp(area.timer.remaining / .3f, 0.f, 1.f);
+        draw.AddCircleFilled(at, radius, flight::Pack({.035f, .04f, .05f, .88f}, alpha), 32);
+        draw.AddCircle(at, radius, flight::Pack({1, 1, 1, .14f}, alpha), 32, 2 * scale);
+        constexpr float start = -1.5707963268f, tau = 6.28318530718f;
+        draw.PathArcTo(at, radius, start, start + tau * area.timer.Progress(), 32);
+        draw.PathStroke(flight::Pack(color, alpha), ImDrawFlags_None, 2 * scale);
+        char text[24]{};
+        std::snprintf(text, sizeof(text), area.timer.estimated ? "~%.0f" : "%.0f", std::ceil(area.timer.remaining));
+        Text(draw, font, 12 * scale, {at.x, at.y - 6 * scale}, {1, 1, 1, 1}, alpha, text, true);
+        Text(draw, font, 10 * scale, {at.x, at.y - radius - 13 * scale}, color, alpha, fire ? "FIRE" : "SMOKE", true);
+        ++count;
+    }
+    draw.PopClipRect();
+    return count;
+}
 inline void Draw(ImDrawList &d, ImFont *font, const FrameSnapshot &frame, Viewport v, const Configuration &c,
                  const Options &o, const WorldSnapshot &world, const Feedback &feedback, const ReplayFrame &,
                  double now) {
+    DrawUtilityTimers(d, font, frame, v, c, o, world);
+    DrawHitFeed(d, font, feedback, v, o, c.opacity, now);
     if (o.areas)
         for (std::size_t i = 0; i < world.areaCount && i < world.areas.size(); ++i) {
             const auto &a = world.areas[i];

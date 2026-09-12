@@ -8,6 +8,13 @@
 #include "kill_sound.hpp"
 #include "trajectory_native.hpp"
 #include "world_native.hpp"
+#include "viewmodel_native.hpp"
+#include "game_frame.hpp"
+#include "cosmetics_native.hpp"
+#include "weather_native.hpp"
+#include "scoreboard_native.hpp"
+#include "native_model_mask.hpp"
+#include "grenade_lineups_draw.hpp"
 #include "combat_draw.hpp"
 #include "world_visuals_draw.hpp"
 #include "trajectory_draw.hpp"
@@ -32,6 +39,10 @@
 #include "assist_runtime.hpp"
 #include "player_decoration.hpp"
 #include "scene_grade.hpp"
+#include "scene_depth_capture.hpp"
+#include "depth_resolve.hpp"
+#include "trajectory_gpu.hpp"
+#include "area_renderer.hpp"
 #include <awareness/FovRing.hpp>
 #include <awareness/AwarenessRing.hpp>
 #include <thread>
@@ -168,6 +179,13 @@ class Renderer {
     WeaponAtlas weapons_;
     ModelPreview modelPreview_;
     SceneGrade sceneGrade_;
+    flight::DepthRenderer trajectories_;
+    combat::AreaRenderer areas_;
+    scene_depth::Resolver depthResolver_;
+    HRESULT depthStart_{S_FALSE};
+    ULONGLONG nextDepthAttempt_{}, nextDepthLog_{};
+    EffectsState areaStatus_;
+    flight::RenderStatus trajectoryStatus_;
     MenuBackground menuBackground_;
     EntityEffects effectsRenderer_;
     std::vector<EffectVertex> effectVertices_;
@@ -242,6 +260,13 @@ class Renderer {
   public:
     ~Renderer() { DestroyImGui(); }
     bool WantsPreview() const noexcept { return previewVisible_; }
+    void Diagnostics(PanelInformation &info) const noexcept {
+        info.trajectoryDepth = trajectoryStatus_.depthAvailable;
+        info.trajectoryVertices = trajectoryStatus_.vertices;
+        info.trajectoryDrawCalls = trajectoryStatus_.drawCalls;
+        info.trajectoryResult = trajectoryStatus_.result;
+        info.areaDepth = areaStatus_.status == EffectsStatus::Ready;
+    }
     bool MenuAnimating() const noexcept { return menuMotion_.Visible(); }
     HRESULT Initialize(IDXGISwapChain *chain, const Configuration &config) {
         ComPtr<ID3D11Device> device;
@@ -296,7 +321,47 @@ class Renderer {
         if (v.x < 0.f || v.y < 0.f || v.x + v.width > static_cast<float>(desc.Width) ||
             v.y + v.height > static_cast<float>(desc.Height))
             return E_INVALIDARG;
+        const bool hiddenModels = info.cs2 && c.enabled && hasFreshFrame && effects.materialEnabled &&
+                                  effects.visibility != EffectVisibility::AlwaysVisible;
+        const bool needDepth =
+            c.enabled && hasFreshFrame &&
+            (visual.bulletTracers || visual.grenadeTrails || visual.grenadePrediction || hiddenModels ||
+             visual.combat.ghosts || (visual.combat.areas && visual.combat.fireArea));
+        if (needDepth && (depthStart_ == S_OK || GetTickCount64() >= nextDepthAttempt_)) {
+            depthStart_ = scene_depth::Start(device_.Get(), context_.Get(), desc.Width, desc.Height);
+            nextDepthAttempt_ = GetTickCount64() + 1000;
+        }
+        auto capturedDepth = needDepth && depthStart_ == S_OK ? scene_depth::BeginOverlay() : scene_depth::Snapshot{};
+        // Declared before SceneScope so capture resumes only after host state restoration.
+        struct ResumeDepth {
+            bool started;
+            ~ResumeDepth() {
+                if (started)
+                    scene_depth::EndOverlay();
+                else
+                    scene_depth::DiscardFrame();
+            }
+        } resumeDepth{needDepth && depthStart_ == S_OK};
+        if (!sceneDepth) {
+            sceneDepth = capturedDepth.view.Get();
+            reversedDepth = capturedDepth.reversed;
+        }
         SceneScope scene(context_.Get(), overlayState_.Get());
+        ComPtr<ID3D11DepthStencilView> resolvedDepth;
+        const auto depthResult =
+            depthResolver_.Resolve(device_.Get(), context_.Get(), desc, sceneDepth, reversedDepth, resolvedDepth);
+        sceneDepth = resolvedDepth.Get();
+        if (info.cs2 && GetTickCount64() >= nextDepthLog_) {
+            nextDepthLog_ = GetTickCount64() + 5000;
+            char depthLog[256]{};
+            std::snprintf(depthLog, sizeof(depthLog),
+                          "Depth: ready=%d start=0x%08X resolve=0x%08X binds=%u clears=%u draws=%u copies=%u "
+                          "reverse=%d target=%ux%u.",
+                          sceneDepth != nullptr, static_cast<unsigned>(depthStart_), static_cast<unsigned>(depthResult),
+                          capturedDepth.eligibleBindings, capturedDepth.depthClears, capturedDepth.qualifiedDraws,
+                          capturedDepth.copies, reversedDepth, desc.Width, desc.Height);
+            OverlayLog(depthLog);
+        }
         ImGuiScope imgui(imgui_);
         RefreshFonts(c, visual);
         studio::Apply(visual);
@@ -366,6 +431,9 @@ class Renderer {
         // An entity layer beneath the GUI in this DLL's own viewport, clipped to the
         // observer camera viewport. No extra OS swap chain or Present recursion.
         auto *d = ImGui::GetBackgroundDrawList();
+        if (c.enabled && hasFreshFrame && info.lineupController && info.lineupCapture)
+            lineups::Draw(*d, font_, info.lineupController->Records(), *info.lineupCapture, frame, v, c, visual.lineups,
+                          FrameSeconds());
         d->Flags |= ImDrawListFlags_AntiAliasedLines | ImDrawListFlags_AntiAliasedFill;
         // ImGui owns and reuses these buffers; reserve once, retain capacity across frames.
         if (d->VtxBuffer.Capacity < 16384)
@@ -381,13 +449,12 @@ class Renderer {
                      IM_COL32(219, 241, 239, 255), IM_COL32(0, 0, 0, 255), false);
         }
         d->PushClipRect({v.x, v.y}, {v.x + v.width, v.y + v.height}, true);
-        if (c.enabled && hasFreshFrame)
-            flight::Draw(*d, trails, flightData.prediction, flightData.tracers, visual.grenadeTrails != 0,
-                         visual.grenadePrediction != 0, visual.bulletTracers != 0,
-                         static_cast<flight::Shots>(visual.tracerTeams), frame.localEntityId, frame.localTeam,
-                         frame.viewProjection, v, FrameSeconds(), c.opacity, visual.paths);
-        if (c.enabled && hasFreshFrame)
-            combat::Draw(*d, font_, frame, v, c, visual.combat, world, flightData.feedback, ghosts, FrameSeconds());
+        if (c.enabled && hasFreshFrame) {
+            auto hudCombat = visual.combat;
+            if (info.cs2)
+                hudCombat.fireArea = 0; // Actual fire cells are drawn in the depth-tested GPU pass.
+            combat::Draw(*d, font_, frame, v, c, hudCombat, world, flightData.feedback, ghosts, FrameSeconds());
+        }
         if (c.enabled && hasFreshFrame)
             worldvisuals::Draw(*d, font_, weapons_.Texture(), frame, v, c, visual.worldVisuals, flightData.footsteps,
                                drops, FrameSeconds());
@@ -443,8 +510,7 @@ class Renderer {
             const bool knownTeam = frame.localTeam != 0 && e.team != 0;
             const bool teammate = knownTeam && e.team == frame.localTeam;
             const float meters = Distance(frame.cameraOrigin, e.origin) / c.worldUnitsPerMeter;
-            if ((!info.cs2 || effects.visibility != EffectVisibility::AlwaysVisible) &&
-                (effects.materialEnabled || effects.glowEnabled))
+            if (!info.cs2 && (effects.materialEnabled || effects.glowEnabled))
                 AppendEffectGeometry(effectVertices_, e, alpha, geometry, effects.geometry, effectsState);
 
             if (!onScreen)
@@ -527,12 +593,24 @@ class Renderer {
         }
         if (c.enabled && hasFreshFrame)
             sceneGrade_.Render(device_.Get(), context_.Get(), backBuffer.Get(), target.Get(), visual.combat);
+        if (c.enabled && hasFreshFrame && info.cs2)
+            areas_.Render(device_.Get(), context_.Get(), target.Get(), desc, sceneDepth, reversedDepth,
+                          frame.viewProjection, v, world, visual.combat, c.opacity, areaStatus_);
         if (c.enabled && hasFreshFrame && visual.combat.ghosts)
             modelPreview_.RenderGhosts(context_.Get(), target.Get(), frame, v, c, visual.combat, ghosts, FrameSeconds(),
                                        sceneDepth, reversedDepth);
         effectsState.result = effectsRenderer_.Render(device_.Get(), context_.Get(), target.Get(), desc, sceneDepth,
                                                       reversedDepth, frame.viewProjection, v, effectVertices_,
                                                       styling::Tint(effects, visual.playerStyle), effectsState);
+        if (info.cs2)
+            native_mask::Render(device_.Get(), context_.Get(), target.Get(), desc, sceneDepth, reversedDepth,
+                                hiddenModels, effectsState);
+        if (c.enabled && hasFreshFrame)
+            trajectories_.Render(device_.Get(), context_.Get(), target.Get(), sceneDepth, reversedDepth, v, trails,
+                                 flightData.prediction, flightData.tracers, visual.grenadeTrails != 0,
+                                 visual.grenadePrediction != 0, visual.bulletTracers != 0,
+                                 static_cast<flight::Shots>(visual.tracerTeams), frame.localEntityId, frame.localTeam,
+                                 frame.viewProjection, FrameSeconds(), c.opacity, visual.paths, trajectoryStatus_);
         context_->OMSetRenderTargets(1, &targetPointer, nullptr);
         // The DX11 backend configures source-alpha blending and disables depth
         // testing/writes. No extra full-screen depth texture or clear is needed.
@@ -554,6 +632,11 @@ struct Runtime {
     VisualOptions visual{};
     flight::Trails trails;
     combat::ReplayFrame ghosts;
+    // Runtime is heap-owned. Reuse these buffers instead of reserving large
+    // temporaries on the application's Present thread on every frame.
+    FrameSnapshot renderFrameScratch;
+    cs2::FlightSnapshot flightScratch;
+    combat::WorldSnapshot worldScratch;
     std::uint64_t hitSerial{}, combatReset{};
     double nextGhostRead{};
     std::uintptr_t flightGeneration{};
@@ -570,6 +653,10 @@ struct Runtime {
     profiles::WorkingFile profileIO;
     profiles::Browser profileBrowser;
     profiles::View profileView;
+    DeferredLog diagnosticLog{OverlayLog};
+    lineups::Controller lineupController;
+    lineups::PanelState lineupPanel;
+    lineups::Capture lineupCapture;
     std::uint64_t profileOperationRevision{};
     std::string profileOperationName;
     bool profileLibraryRequested{};
@@ -591,6 +678,7 @@ struct Runtime {
     assist::Runtime assistedInput;
     ~Runtime() {
         assistedInput.Stop();
+        lineupController.Stop();
         profileIO.Stop();
     }
     session::Tools sessionTools;
@@ -780,7 +868,7 @@ struct Runtime {
                                  : hasInput && input.activationHeld != 0;
         if (!useCs2 && !hasInput)
             return finish(TrackingStatus::WaitingForCamera);
-        if (!held)
+        if (!held || (useCs2 && bridge.AssistKeys().textInput))
             return finish(TrackingStatus::WaitingForHotkey);
         if (useCs2 && !source.TrackingWeaponCurrent())
             return finish(TrackingStatus::WaitingForData);
@@ -792,7 +880,10 @@ struct Runtime {
             angles = cs2::TrackingAngles(native);
         }
         Vector3 trackingPunch{};
-        if (useCs2 && recoilSettings.recoil && flightData.recoil.valid && FrameSeconds() - flightData.sampledAt < .1 &&
+        if (useCs2 && recoilSettings.EnabledFor(flightData.recoil.weapon) && flightData.recoil.valid &&
+            flightData.recoil.owner == source.Tracking().owner &&
+            flightData.recoil.weaponHandle == source.Tracking().weaponHandle &&
+            FrameSeconds() - flightData.sampledAt < .1 &&
             flightData.recoil.shots >= recoilSettings.Profile(flightData.recoil.weapon).startShot) {
             const auto &profile = recoilSettings.Profile(flightData.recoil.weapon);
             trackingPunch = {flightData.recoil.punch.x * profile.vertical,
@@ -883,7 +974,7 @@ struct Runtime {
         const bool toggle = bridge.TakeOverlayToggle();
         Configuration c;
         TrackingConfiguration t;
-        FrameSnapshot f;
+        auto &f = renderFrameScratch;
         bool hasData;
         ULONGLONG timestamp;
         std::uint64_t revision{};
@@ -919,8 +1010,18 @@ struct Runtime {
             trails.Clear();
             cs2::PauseTrajectories();
             cs2::PauseWorldEffects();
+            cs2::ConfigureViewmodel({}, false);
+            cs2::ConfigureWeather({}, false);
+            cs2::ConfigureScoreboard({}, false);
+            cosmetics::Configure({});
+            native_mask::Discard();
             ghosts.Clear();
             if (useCs2) {
+                assist::Request pausedInput;
+                pausedInput.options = visual.assists;
+                pausedInput.window = window;
+                pausedInput.deadline = GetTickCount64() + 100;
+                assistedInput.Configure(pausedInput);
                 cs2::PauseModelFill();
                 source.ClearHighlight();
             }
@@ -957,12 +1058,40 @@ struct Runtime {
         info.keepAwakeActive = sessionTools.PowerActive();
         const bool fresh =
             hasData && (!c.staleFrameMilliseconds || GetTickCount64() - timestamp <= c.staleFrameMilliseconds);
-        cs2::FlightSnapshot flightData;
+        lineupController.Tick();
+        info.modelDiagnostics = cs2::GetModelFillDiagnostics();
+        const auto cosmeticsCatalog = useCs2 && (bridge.Visible() || renderer->MenuAnimating())
+                                          ? cosmetics::CatalogRuntime().Snapshot()
+                                          : nullptr;
+        info.cosmeticsCatalog = cosmeticsCatalog.get();
+        info.cosmeticsStatus = cosmetics::Name(cosmetics::Status().state);
+        info.weatherStatus = weather::Label(cs2::ReadWeatherDiagnostics().status);
+        info.scoreboardReady = cs2::GetScoreboardStatus().connected;
+        info.nativeFramesReady = cs2::frame::Diagnostics().connected;
+        info.nativeFrameFailures = cs2::frame::Diagnostics().failedCallbacks;
+        info.lineupController = &lineupController;
+        info.lineupPanel = &lineupPanel;
+        info.lineupCapture = &lineupCapture;
+        lineupCapture.valid = false;
+        auto &flightData = flightScratch;
+        ResetInPlace(flightData);
         if (useCs2) {
             cs2::ConfigureTrajectories(visual, fresh && c.enabled,
-                                       !bridge.Visible() && GetForegroundWindow() == window);
+                                       !bridge.Visible() && !bridge.AssistKeys().textInput &&
+                                           GetForegroundWindow() == window);
             cs2::RefreshTrajectoryInputs();
-            cs2::CopyTrajectories(flightData);
+            cs2::CopyTrajectories(flightData, &diagnosticLog);
+            cs2::ConfigureViewmodel(visual.cameraVisuals, fresh && c.enabled);
+            const auto &capture = flightData.lineup;
+            if (fresh && capture.valid && FrameSeconds() - capture.time <= .25) {
+                lineupCapture.valid = true;
+                lineupCapture.feet = capture.feet;
+                lineupCapture.eye = capture.eye;
+                lineupCapture.pitch = capture.angles.x;
+                lineupCapture.yaw = capture.angles.y;
+                lineupCapture.weapon = capture.weapon;
+                lineupCapture.time = capture.time;
+            }
             info.pathsConnected = flightData.hooked;
             info.tracerCallbacks = flightData.tracerCallbacks;
             info.acceptedTracers = flightData.acceptedTracers;
@@ -1012,16 +1141,20 @@ struct Runtime {
         }
         info.appVersion = vortex::AppVersion;
         info.trackingWeapon = useCs2 ? source.Tracking().weapon : awareness::tracking::LocalWeapon(f);
-        info.footstepEvents = flightData.footstepEvents;
+        if (useCs2 && fresh && visual.worldVisuals.footsteps)
+            flightData.footsteps = worldvisuals::Footsteps::MergeLive(flightData.footsteps, source.Footsteps(),
+                                                                      FrameSeconds(), visual.worldVisuals.footDuration);
+        info.footstepEvents = flightData.footstepEvents + source.FootstepCount();
         info.droppedWeapons = useCs2 ? source.Dropped().count : 0;
-        combat::WorldSnapshot world;
+        auto &world = worldScratch;
+        world.Clear();
         if (useCs2 && fresh && c.enabled) {
             if (combatReset != flightData.resetSerial) {
                 ghosts.Clear();
                 nextGhostRead = 0;
                 combatReset = flightData.resetSerial;
             }
-            if (visual.combat.bombTimer || visual.combat.areas)
+            if (visual.combat.bombTimer || visual.combat.areas || visual.combat.utilityTimers)
                 source.ReadWorld(flightData.gameTime, world, flightData.infernos);
             const auto now = FrameSeconds();
             if (visual.combat.areas && visual.combat.fireArea)
@@ -1079,6 +1212,8 @@ struct Runtime {
             profileLibraryRequested = true;
             profileView.busy = info.profileIoBusy = profileBrowser.Busy();
         }
+        renderer->Diagnostics(info);
+        info.areaCells = world.burningCells;
         info.renderMs = renderMs;
         info.readMs = useCs2 ? source.ReadMilliseconds() : readMs;
         info.totalMs = totalMs;
@@ -1101,8 +1236,18 @@ struct Runtime {
             trails.Clear();
             cs2::PauseTrajectories();
             cs2::PauseWorldEffects();
+            cs2::ConfigureViewmodel({}, false);
+            cs2::ConfigureWeather({}, false);
+            cs2::ConfigureScoreboard({}, false);
+            cosmetics::Configure({});
+            native_mask::Discard();
             ghosts.Clear();
             if (useCs2) {
+                assist::Request pausedInput;
+                pausedInput.options = visual.assists;
+                pausedInput.window = window;
+                pausedInput.deadline = GetTickCount64() + 100;
+                assistedInput.Configure(pausedInput);
                 cs2::PauseModelFill();
                 source.ClearHighlight();
             }
@@ -1134,7 +1279,8 @@ struct Runtime {
         sounds.Configure(visual.killSoundEnabled != 0, visual.killSoundPath, visual.killSoundVolume);
         if (useCs2)
             cs2::ConfigureTrajectories(visual, fresh && c.enabled && !actions.rescan,
-                                       !bridge.Visible() && GetForegroundWindow() == window);
+                                       !bridge.Visible() && !bridge.AssistKeys().textInput &&
+                                           GetForegroundWindow() == window);
         if (actions.rescan) {
             trails.Clear();
             ghosts.Clear();
@@ -1155,8 +1301,17 @@ struct Runtime {
         hitSerial = flightData.feedback.serial;
         if (fresh && c.enabled && !actions.rescan)
             hitSounds.Trigger(hits);
-        cs2::ConfigureWorldEffects(visual.combat, world,
+        cs2::ConfigureWorldEffects(visual.combat, world, visual.scene,
                                    useCs2 && fresh && c.enabled && SUCCEEDED(hr) && !actions.rescan);
+        if (useCs2) {
+            const bool nativeFresh = fresh && c.enabled && SUCCEEDED(hr) && !actions.rescan;
+            cs2::ConfigureWeather(visual.weather, nativeFresh);
+            cs2::ConfigureScoreboard(visual.scoreboard, nativeFresh);
+            auto loadout = visual.cosmetics;
+            if (!nativeFresh)
+                loadout.enabled = 0;
+            cosmetics::Configure(loadout);
+        }
         if (actions.browseSound)
             sounds.Browse();
         if (actions.testSound)
@@ -1165,20 +1320,22 @@ struct Runtime {
         const bool killReady = useCs2 && fresh && !actions.rescan && source.ReadKills(killSample);
         if (const auto count = kills.Update(killSample, killReady, visual.killSoundEnabled != 0))
             sounds.Trigger(count);
+        const auto hiddenStatus = nextEffects;
         auto nativeEffects = styling::Tint(effectConfig, visual.playerStyle);
         if (useCs2) {
-            if (effectConfig.visibility != EffectVisibility::AlwaysVisible &&
-                nextEffects.status == EffectsStatus::Ready) {
-                cs2::PauseModelFill();
-                if (!source.ClearHighlight()) {
-                    nextEffects.status = EffectsStatus::Failed;
-                    nextEffects.result = E_ACCESSDENIED;
+            if (cs2::UpdateModelFill(f, c, nativeEffects,
+                                     fresh && SUCCEEDED(hr) && !actions.rescan && source.GetStatus().buildVerified &&
+                                         source.GetStatus().gameBuild == cs2::offsets::ExpectedBuild,
+                                     nextEffects, visual.shadedFill != 0, &source.ModelTargets())) {
+                if (nativeEffects.materialEnabled && nativeEffects.visibility != EffectVisibility::AlwaysVisible) {
+                    nextEffects.depthAvailable = nextEffects.depthAvailable && hiddenStatus.depthAvailable;
+                    nextEffects.meshCount += hiddenStatus.meshCount;
+                    if (nextEffects.status != EffectsStatus::NoGeometry) {
+                        nextEffects.status =
+                            nextEffects.depthAvailable ? hiddenStatus.status : EffectsStatus::DepthUnavailable;
+                        nextEffects.result = hiddenStatus.result;
+                    }
                 }
-            } else if (cs2::UpdateModelFill(f, c, nativeEffects,
-                                            fresh && SUCCEEDED(hr) && !actions.rescan &&
-                                                source.GetStatus().buildVerified &&
-                                                source.GetStatus().gameBuild == cs2::offsets::ExpectedBuild,
-                                            nextEffects, visual.shadedFill != 0, &source.ModelTargets())) {
                 const auto halo = NativeHalo(nativeEffects, visual, FrameSeconds());
                 if (halo.materialEnabled && halo.materialColor.a > 0) {
                     EffectsState haloState;
@@ -1224,6 +1381,7 @@ struct Runtime {
             request.deadline = GetTickCount64() + 100;
             request.trackingKey = resolved.hotkey;
             request.trackingEnabled = resolved.enabled != 0;
+            request.recoilEnabled = visual.combat.EnabledFor(source.Tracking().weapon);
             request.enabled = c.enabled && fresh && SUCCEEDED(hr) && !actions.rescan && !bridge.Visible();
             assistedInput.Configure(request);
         }
@@ -1251,6 +1409,14 @@ HRESULT STDMETHODCALLTYPE PresentHook(IDXGISwapChain *chain, UINT interval, UINT
     }
     const bool selected = r && r->bound.load(std::memory_order_acquire) == chain;
     HRESULT renderResult = S_FALSE;
+    struct CaptureFrameGuard {
+        bool selected;
+        const HRESULT &result;
+        ~CaptureFrameGuard() {
+            if (selected && result != S_OK)
+                scene_depth::DiscardFrame();
+        }
+    } captureFrameGuard{selected, renderResult};
     if (selected) {
         try {
             renderResult = r->RenderFrame(flags);
@@ -1386,6 +1552,13 @@ HRESULT StartAutomatic(HWND window, const Configuration *config, bool cs2Mode) {
         // Material creation must not prevent the independent event/input hooks starting.
         cs2::StartTrajectories();
         cs2::StartWorldEffects();
+        cs2::StartViewmodel();
+        cosmetics::Initialize(reinterpret_cast<std::uintptr_t>(GetModuleHandleW(L"client.dll")));
+        cs2::StartWeather();
+        cs2::StartScoreboard();
+        constexpr cs2::frame::Callback nativeCallbacks[]{cosmetics::Tick, cs2::TickWeather, cs2::TickScoreboard};
+        if (FAILED(cs2::frame::Start(nativeCallbacks)))
+            OverlayLog("Native extensions unavailable: frame dispatcher validation failed.");
         cs2::StartModelFill();
     }
     return installed;
@@ -1665,9 +1838,30 @@ HRESULT __cdecl AwarenessShutdown() noexcept {
         if (r) {
             if (r->bound.load() && GetCurrentThreadId() != r->renderThread)
                 return RPC_E_WRONG_THREAD;
+            if (r->useCs2) {
+                const auto cosmeticsStopped = cosmetics::StopNative();
+                if (FAILED(cosmeticsStopped))
+                    return cosmeticsStopped;
+                const auto weatherStopped = cs2::StopWeather();
+                if (FAILED(weatherStopped))
+                    return weatherStopped;
+                const auto scoreboardStopped = cs2::StopScoreboard();
+                if (FAILED(scoreboardStopped))
+                    return scoreboardStopped;
+                const auto framesStopped = cs2::frame::Stop();
+                if (FAILED(framesStopped))
+                    return framesStopped;
+                cosmetics::Shutdown();
+            }
+            const auto depthStopped = scene_depth::Stop();
+            if (FAILED(depthStopped))
+                return depthStopped;
             const auto fillStopped = cs2::StopModelFill();
             if (FAILED(fillStopped))
                 return fillStopped;
+            const auto viewmodelStopped = cs2::StopViewmodel();
+            if (FAILED(viewmodelStopped))
+                return viewmodelStopped;
             const auto worldStopped = cs2::StopWorldEffects();
             if (FAILED(worldStopped))
                 return worldStopped;
@@ -1708,5 +1902,5 @@ extern "C" __declspec(dllexport) BOOL __cdecl AwarenessProfileIoBusy() noexcept 
         return FALSE;
     if (GetCurrentThreadId() != r->renderThread)
         return TRUE;
-    return r->profileIO.Busy() || r->profileBrowser.Busy();
+    return r->profileIO.Busy() || r->profileBrowser.Busy() || r->lineupController.Busy();
 }

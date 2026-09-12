@@ -214,7 +214,7 @@ LRESULT CALLBACK WindowBridge::Procedure(HWND window, UINT message, WPARAM wpara
     bool controlHeld{};
     {
         std::scoped_lock lock(bridge->inputMutex_);
-        bridge->physical_.Event(message, wparam, lparam, extra);
+        bridge->physical_.Event(message, wparam, lparam, extra, !bridge->Visible());
         const bool consumed = bridge->capture_.Event(message, wparam, lparam);
         controlHeld = bridge->capture_.Held(VK_LCONTROL) || bridge->capture_.Held(VK_RCONTROL);
         if (message == WM_KILLFOCUS)

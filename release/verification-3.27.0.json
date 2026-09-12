@@ -1,0 +1,46 @@
+{
+  "version": "3.27.0",
+  "phase": "Local integrated preflight before release packaging",
+  "verifiedAtUtc": "2026-09-12T02:37:05.1541599Z",
+  "build": "Release x64",
+  "offlineTests": {
+    "failed": 0,
+    "passed": 54,
+    "total": 54
+  },
+  "focusedChecks": {
+    "modelDraw": 974,
+    "nativeModelMask": 39,
+    "cosmeticsWithInstalledCatalog": 47
+  },
+  "liveGameplayVerified": false,
+  "gameLaunched": false,
+  "gameInspected": false,
+  "settingsProfileCount": 7,
+  "activeSettingsPreserved": true,
+  "activeSettingsSha256": "A67CE5B3F513338E35F1BC5B9F1C46C178C4EACF8377DC76AFAB66333442C50C",
+  "dllSha256": "33D3F169971509305EE82BB71BAE6AB39E2CDDA32D53BEDE37D67933D51EE9CB",
+  "nativeBuild": 14181,
+  "completedPorts": [
+    "hidden-only and two-color model mask",
+    "local weapon/knife/glove/agent cosmetics",
+    "native rain/snow/ash",
+    "native scoreboard equipment"
+  ],
+  "integrationNotes": "docs/integration-3.27.md",
+  "evidence": [
+    "docs/native-hidden-models-3.27.md",
+    "docs/cosmetics-native.md",
+    "docs/weather-native.md",
+    "docs/native-frame-scoreboard-3.27.md"
+  ],
+  "releaseWorkflow": ".github/workflows/release.yml",
+  "packagingVerification": "release.ps1 repeats build/tests, validates installer/feed/checksums, and only then publishes a tag",
+  "limitations": [
+    "Offline validation only; live compatibility and FPS are not claimed",
+    "Engine-culled geometry and alpha-test cutouts are not recovered by hidden mask",
+    "Hidden draw/composite, particles, and first-use model loading have a cost",
+    "Scoreboard activation uses Tab; lineup map selection is manual",
+    "Optional source capabilities outside these four ports are listed separately in the feature inventory"
+  ]
+}

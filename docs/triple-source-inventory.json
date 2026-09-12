@@ -1,0 +1,3031 @@
+{
+  "Anthony": {
+    "files": [
+      {
+        "path": ".gitignore",
+        "bytes": 576,
+        "sha256": "a1b309448f728a132cf3da5dee17d3d29c68ddabcfe496b73dde03ebbcf7ff89",
+        "kind": "project",
+        "lines": null
+      },
+      {
+        "path": "AGENTS.md",
+        "bytes": 20832,
+        "sha256": "90514618a1359c1bdc66cb986994d2c334bff004bd4adc5f76b3c318547c01d5",
+        "kind": "project",
+        "lines": 439
+      },
+      {
+        "path": "Lefrizzel AI/build_log.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "kind": "project",
+        "lines": 0
+      },
+      {
+        "path": "Lefrizzel AI/external/imgui/imconfig.h",
+        "bytes": 12173,
+        "sha256": "1353bfa59da16eec481723fd4e5d910356f0406b79e3c4142e0c9867bafffab5",
+        "kind": "dependency",
+        "lines": 148
+      },
+      {
+        "path": "Lefrizzel AI/external/imgui/imgui.cpp",
+        "bytes": 965376,
+        "sha256": "4e81a96e5a7c05bca66697225d9a3e42f85139833cd0cceed37918862394e3f4",
+        "kind": "dependency",
+        "lines": 18379
+      },
+      {
+        "path": "Lefrizzel AI/external/imgui/imgui.h",
+        "bytes": 426837,
+        "sha256": "12790cf3bd0a074893c74f6707fe4169038b42ed5e04c71e7e4bf5030fa1f0ba",
+        "kind": "dependency",
+        "lines": 4245
+      },
+      {
+        "path": "Lefrizzel AI/external/imgui/imgui_demo.cpp",
+        "bytes": 587055,
+        "sha256": "34c00237dd9ab891dc9b7262e797182980eaa5028d9cf8523602a02ac327b006",
+        "kind": "dependency",
+        "lines": 11198
+      },
+      {
+        "path": "Lefrizzel AI/external/imgui/imgui_draw.cpp",
+        "bytes": 379689,
+        "sha256": "1ab7e62bbe1f7aefbe70b7b2a58b7f7cfed7000a6a9b70a2842c1f1671c28189",
+        "kind": "dependency",
+        "lines": 6777
+      },
+      {
+        "path": "Lefrizzel AI/external/imgui/imgui_impl_dx11.cpp",
+        "bytes": 36392,
+        "sha256": "1c0c3af25b45dceb4c45de7da591244f4935718154e7149d0e90858958c6f19d",
+        "kind": "dependency",
+        "lines": 693
+      },
+      {
+        "path": "Lefrizzel AI/external/imgui/imgui_impl_dx11.h",
+        "bytes": 2945,
+        "sha256": "fb8a314a6a2904dcc5bfeb938a169389e170f233ad367d33f1ce5c7bde586a7c",
+        "kind": "dependency",
+        "lines": 53
+      },
+      {
+        "path": "Lefrizzel AI/external/imgui/imgui_impl_win32.cpp",
+        "bytes": 51651,
+        "sha256": "12316399a6acd772a2ec376df7a6eeb138b385f0e00c2dc4d48776a25cc81794",
+        "kind": "dependency",
+        "lines": 1002
+      },
+      {
+        "path": "Lefrizzel AI/external/imgui/imgui_impl_win32.h",
+        "bytes": 3491,
+        "sha256": "2736595b8de1e56871661d5d9b96deec567d35521746fbe2ade8f0543acdfd2b",
+        "kind": "dependency",
+        "lines": 54
+      },
+      {
+        "path": "Lefrizzel AI/external/imgui/imgui_internal.h",
+        "bytes": 303546,
+        "sha256": "341e5a7656be0079e1aac3203d18eaea224d5a0f2b655fa88851a5f4f8c714ff",
+        "kind": "dependency",
+        "lines": 4025
+      },
+      {
+        "path": "Lefrizzel AI/external/imgui/imgui_tables.cpp",
+        "bytes": 257058,
+        "sha256": "33b5146f5eb362605a166e532b336d1955579743eab719d96241a163a21222eb",
+        "kind": "dependency",
+        "lines": 4666
+      },
+      {
+        "path": "Lefrizzel AI/external/imgui/imgui_widgets.cpp",
+        "bytes": 551648,
+        "sha256": "ab471e013501084963b86240ad7b29246e52fa962c21fb20bf2d265a26110d4e",
+        "kind": "dependency",
+        "lines": 10995
+      },
+      {
+        "path": "Lefrizzel AI/external/imgui/imstb_rectpack.h",
+        "bytes": 20346,
+        "sha256": "889b396795202d1457560a797a7242e96f6f132d4b88ca2d69be58bf05e1771f",
+        "kind": "dependency",
+        "lines": 628
+      },
+      {
+        "path": "Lefrizzel AI/external/imgui/imstb_textedit.h",
+        "bytes": 60111,
+        "sha256": "a985f5fa0ed97353d493b497961e9eef52082edcd045cf6954b69990ec9d0741",
+        "kind": "dependency",
+        "lines": 1528
+      },
+      {
+        "path": "Lefrizzel AI/external/imgui/imstb_truetype.h",
+        "bytes": 199503,
+        "sha256": "c51a0f7e7ea760f2366bd3752635ec58e21fccfec4a832501639990ba6ce0528",
+        "kind": "dependency",
+        "lines": 5086
+      },
+      {
+        "path": "Lefrizzel AI/external/json/json.hpp",
+        "bytes": 938801,
+        "sha256": "fd5a9349e47ad705eafe878faedc1fdb910b0bfe0c3a7e06dbcfb19acd82162c",
+        "kind": "dependency",
+        "lines": 24764
+      },
+      {
+        "path": "Lefrizzel AI/external/lz4.c",
+        "bytes": 3616,
+        "sha256": "372889f1d2562b7cf6152d998b0c79c7ccee9e34bfc6e8cf77b40bf211fb851b",
+        "kind": "dependency",
+        "lines": 150
+      },
+      {
+        "path": "Lefrizzel AI/external/lz4.h",
+        "bytes": 43254,
+        "sha256": "560bd8f08e2c1449af2d73fa3d316750fc53467eadc7161e32ce5988c5b9316d",
+        "kind": "dependency",
+        "lines": 810
+      },
+      {
+        "path": "Lefrizzel AI/external/safetyhook/safetyhook.cpp",
+        "bytes": 53131,
+        "sha256": "c81332ba0b568bded8a8264c58661e0e66c8507e7d698e043f06e78f5f23390b",
+        "kind": "dependency",
+        "lines": 1668
+      },
+      {
+        "path": "Lefrizzel AI/external/safetyhook/safetyhook.hpp",
+        "bytes": 47201,
+        "sha256": "a3222b0244446749ff84894e02308adce24166c98fbf8448f025c6db98f83b58",
+        "kind": "dependency",
+        "lines": 1282
+      },
+      {
+        "path": "Lefrizzel AI/external/safetyhook/Zydis.c",
+        "bytes": 11762812,
+        "sha256": "ad1d0ecb3935432d1f42504955d5b8740c0e7e091a3fb52bc751addc0d39e36c",
+        "kind": "dependency",
+        "lines": 54198
+      },
+      {
+        "path": "Lefrizzel AI/external/safetyhook/Zydis.h",
+        "bytes": 400974,
+        "sha256": "a0b01729ce666949ed267c5d08012e2007a022cf43eb876542df66271e6869ed",
+        "kind": "dependency",
+        "lines": 11886
+      },
+      {
+        "path": "Lefrizzel AI/external/stb_image.h",
+        "bytes": 284733,
+        "sha256": "e87556587ed948c613dfe7a4c7d2261473bd2ea3aff1086f5af90aa2175de1b0",
+        "kind": "dependency",
+        "lines": 7988
+      },
+      {
+        "path": "Lefrizzel AI/Lefrizzel-Ai.filters",
+        "bytes": 2783,
+        "sha256": "1f312cf41563b3476d6ef37abe440bd73bae7241864c4bb5680e65d8d86e0e76",
+        "kind": "project",
+        "lines": 79
+      },
+      {
+        "path": "Lefrizzel AI/Lefrizzel-Ai.vcxproj",
+        "bytes": 24657,
+        "sha256": "0804f84406369c04c5d017d637edf525ac88cb68b80a64ffff083cab63e19738",
+        "kind": "project",
+        "lines": 389
+      },
+      {
+        "path": "Lefrizzel AI/source/cs2/datatypes/cutl/utlhash/utlhash.cpp",
+        "bytes": 215,
+        "sha256": "597df7008cb08a69e619ef6604ffe9a303608c92b01c0476571f0dc6c536852d",
+        "kind": "project",
+        "lines": 17
+      },
+      {
+        "path": "Lefrizzel AI/source/cs2/datatypes/cutl/utlhash/utlhash.h",
+        "bytes": 4247,
+        "sha256": "ac636f9e85c17d209146d902c41ba343bcfbdbc7bd534e9f4a9e85a193f7b09b",
+        "kind": "project",
+        "lines": 172
+      },
+      {
+        "path": "Lefrizzel AI/source/cs2/datatypes/cutlbuffer/cutlbuffer.cpp",
+        "bytes": 603,
+        "sha256": "6446dbae3eff75b41ee84a9f2323a3cad8a2304461a9039167e12d781d650a2e",
+        "kind": "project",
+        "lines": 30
+      },
+      {
+        "path": "Lefrizzel AI/source/cs2/datatypes/cutlbuffer/cutlbuffer.h",
+        "bytes": 198,
+        "sha256": "acff80c30d37c931a6b319ece66f44102e71fcb34acd0e0daf382035a1dcf0d5",
+        "kind": "project",
+        "lines": 15
+      },
+      {
+        "path": "Lefrizzel AI/source/cs2/datatypes/keyvalues/keyvalues.cpp",
+        "bytes": 5756,
+        "sha256": "3a9396804c3d60d30dca9d082621541ac590ddeb6756355e9a14debcc7304f19",
+        "kind": "project",
+        "lines": 195
+      },
+      {
+        "path": "Lefrizzel AI/source/cs2/datatypes/keyvalues/keyvalues.h",
+        "bytes": 727,
+        "sha256": "850da669c4c2b801828db945c90bf1498854df4828a926c322ef409b09f5495b",
+        "kind": "project",
+        "lines": 33
+      },
+      {
+        "path": "Lefrizzel AI/source/cs2/datatypes/schema/ISchemaClass/ISchemaClass.cpp",
+        "bytes": 1883,
+        "sha256": "93498fcff50053106c9de42d9ab38504dfdf30dd5469bb58dc3bbf3f407eea45",
+        "kind": "project",
+        "lines": 76
+      },
+      {
+        "path": "Lefrizzel AI/source/cs2/datatypes/schema/ISchemaClass/ISchemaClass.h",
+        "bytes": 4630,
+        "sha256": "4c7f8b48005f502433c8739b96cd7c1f6c504e9a8278a6a8bdd1b5e9c0525ee6",
+        "kind": "project",
+        "lines": 172
+      },
+      {
+        "path": "Lefrizzel AI/source/cs2/datatypes/viewmatrix/viewmatrix.h",
+        "bytes": 119,
+        "sha256": "ad5765af320990e2834737d86e34b1a14f0d8d642c80ae3794235eae39e0f4f9",
+        "kind": "project",
+        "lines": 8
+      },
+      {
+        "path": "Lefrizzel AI/source/cs2/entity/C_AggregateSceneObject/C_AggregateSceneObject.h",
+        "bytes": 617,
+        "sha256": "ea9cc1dd76c1ff2eb077d9b1845f116e214d28b37bd21ae99f1458e31e1d6768",
+        "kind": "project",
+        "lines": 25
+      },
+      {
+        "path": "Lefrizzel AI/source/cs2/entity/C_BaseEntity/C_BaseEntity.h",
+        "bytes": 3318,
+        "sha256": "007c3f4cec9d769528e617921dc8ea02d76bae0fce69066968dfc31f81e43f01",
+        "kind": "project",
+        "lines": 101
+      },
+      {
+        "path": "Lefrizzel AI/source/cs2/entity/C_CSPlayerPawn/C_CSPlayerPawn.cpp",
+        "bytes": 3935,
+        "sha256": "c80e1d308b2c9583a8fe996d3438d45519bd45e3237218469848521bc2aac7c9",
+        "kind": "project",
+        "lines": 139
+      },
+      {
+        "path": "Lefrizzel AI/source/cs2/entity/C_CSPlayerPawn/C_CSPlayerPawn.h",
+        "bytes": 2181,
+        "sha256": "0d958a282b4a76b1fbc4cd7d59c1052d19196234995f5d09d48e4ed593ad9b7c",
+        "kind": "project",
+        "lines": 48
+      },
+      {
+        "path": "Lefrizzel AI/source/cs2/entity/C_CSWeaponBase/C_CSWeaponBase.cpp",
+        "bytes": 2698,
+        "sha256": "2797434c8e2ecc208699a3a2fe329b476708f0913d2e8e440aeab2c636304c6c",
+        "kind": "project",
+        "lines": 71
+      },
+      {
+        "path": "Lefrizzel AI/source/cs2/entity/C_CSWeaponBase/C_CSWeaponBase.h",
+        "bytes": 5824,
+        "sha256": "1ffe6b20e3f738a2a132a35725efce6b970f75ef383ba2d7f0229629fc4d870c",
+        "kind": "project",
+        "lines": 107
+      },
+      {
+        "path": "Lefrizzel AI/source/cs2/entity/C_EntityInstance/C_EntityInstance.h",
+        "bytes": 1531,
+        "sha256": "379f4377550828b64f7c426e3066623cb64ee09be93ec1bcb6e2398a6d282a11",
+        "kind": "project",
+        "lines": 68
+      },
+      {
+        "path": "Lefrizzel AI/source/cs2/entity/C_Material/C_Material.h",
+        "bytes": 2949,
+        "sha256": "d83cb49dd1064b859c0dccb30b5a85ae8a2726795af06bee71c16566cf399c9a",
+        "kind": "project",
+        "lines": 104
+      },
+      {
+        "path": "Lefrizzel AI/source/cs2/entity/CCSPlayerController/CCSPlayerController.cpp",
+        "bytes": 1016,
+        "sha256": "4a455c5d91c81fbb549b176366bde2c8333077ceb06a5223affac5d3a8d4d830",
+        "kind": "project",
+        "lines": 44
+      },
+      {
+        "path": "Lefrizzel AI/source/cs2/entity/CCSPlayerController/CCSPlayerController.h",
+        "bytes": 1624,
+        "sha256": "de546f83c092e0d653d481775994784529ab512452fa815f301e00fddc33eb1b",
+        "kind": "project",
+        "lines": 43
+      },
+      {
+        "path": "Lefrizzel AI/source/cs2/entity/handle.h",
+        "bytes": 1915,
+        "sha256": "c454ca6d48adfc5b966f2fec15418ef2ef533517a03223009856ac569f6ce027",
+        "kind": "project",
+        "lines": 113
+      },
+      {
+        "path": "Lefrizzel AI/source/cs2/sdk/CUtlSymbolLarge.h",
+        "bytes": 860,
+        "sha256": "d07aebcd15f8e6db5b37297f78a508066476071f9da1068547abbcd0312569ca",
+        "kind": "project",
+        "lines": 35
+      },
+      {
+        "path": "Lefrizzel AI/source/cs2/sdk/IGameEvent.cpp",
+        "bytes": 6859,
+        "sha256": "c95a6b190b37051417dc15c2a0921b9c89f7b74446be8ff93c4b699a74f974e0",
+        "kind": "project",
+        "lines": 156
+      },
+      {
+        "path": "Lefrizzel AI/source/cs2/sdk/IGameEvent.h",
+        "bytes": 2155,
+        "sha256": "1d26efbc6b026bcf94e8de3e2615252b4be08eb992ada559034e79edce8d32cc",
+        "kind": "project",
+        "lines": 81
+      },
+      {
+        "path": "Lefrizzel AI/source/debug/debug.cpp",
+        "bytes": 1589,
+        "sha256": "204760d5e52884059fb48aa2a34a90ed2bfc3d5813b13bb1dad7de661a168608",
+        "kind": "project",
+        "lines": 69
+      },
+      {
+        "path": "Lefrizzel AI/source/debug/debug.h",
+        "bytes": 622,
+        "sha256": "890bc97c7532a1c88eb179716f8fe435bf07d296aafef9080a230a47189393d4",
+        "kind": "project",
+        "lines": 21
+      },
+      {
+        "path": "Lefrizzel AI/source/includes.h",
+        "bytes": 432,
+        "sha256": "aef06cdcaaa8d9acee9876465ac29ba7ad3c9ed08d79701f9e2b286f71089c80",
+        "kind": "project",
+        "lines": 14
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/config/config.cpp",
+        "bytes": 49631,
+        "sha256": "5bfbe93552918fb03f45f8700112f6f183abf8d95c0afde4267fbc9594dea142",
+        "kind": "project",
+        "lines": 1387
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/config/config.h",
+        "bytes": 27566,
+        "sha256": "829776c16144068b4b53f4dcf1b31243c986039dfd005b72dab49543dd954f7b",
+        "kind": "project",
+        "lines": 849
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/config/configmanager.h",
+        "bytes": 120766,
+        "sha256": "7dec6397140e5cc071bea95031bb55dd25c2920b991baa6d27ab8920138024ce",
+        "kind": "project",
+        "lines": 3369
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/aim/aim.cpp",
+        "bytes": 41493,
+        "sha256": "76aa843f862d1416a66a6399fe4b3a65c3280990f75e527f5eecac781b52dbbc",
+        "kind": "project",
+        "lines": 1340
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/aim/aim.h",
+        "bytes": 371,
+        "sha256": "fb27aa282d12bac06d91c8b65efad0823f46bddea5baf60f53958f09b35410eb",
+        "kind": "project",
+        "lines": 13
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/aim/aim_common.cpp",
+        "bytes": 45297,
+        "sha256": "f2eecc05354d4bd078d51f6c6cfe99130e0f5d4ed3d0218a7e1ff8dac10f5c60",
+        "kind": "project",
+        "lines": 1455
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/aim/aim_common.h",
+        "bytes": 4496,
+        "sha256": "aa898182a3ddb9bfb2fd23183ad9c90a362ceddcbab92c363d1f471ce1777d7b",
+        "kind": "project",
+        "lines": 110
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/auto_pistol/auto_pistol.cpp",
+        "bytes": 7225,
+        "sha256": "6883960c26011607277d2c3e2b29e01862da07ebef419de9131bf937103a283b",
+        "kind": "project",
+        "lines": 277
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/auto_pistol/auto_pistol.h",
+        "bytes": 174,
+        "sha256": "602c790169eaf380df1d8deb9549b6e85e32e0348f6b75b8fba27d408548aa4f",
+        "kind": "project",
+        "lines": 12
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/autofire/autofire.cpp",
+        "bytes": 48384,
+        "sha256": "8b9c61f5bb42b4592175369b6e7433eb9d91fe3fd608513b0a2441712f0bd073",
+        "kind": "project",
+        "lines": 1465
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/autofire/autofire.h",
+        "bytes": 499,
+        "sha256": "a4dc363c00deff293e7b5b59584dc23a59d178b2a4a428cf3489eb61d37d001c",
+        "kind": "project",
+        "lines": 26
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/autowall/autowall.cpp",
+        "bytes": 42611,
+        "sha256": "101e4a0fed606532ede61cbb77493a0ff9fda85abc42208b5ffc546bd6ccaedb",
+        "kind": "project",
+        "lines": 1393
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/autowall/autowall.h",
+        "bytes": 1823,
+        "sha256": "d4cdb5cb86614dc5073483040be612db7b13908d01b65a593ec1ae4f51bad553",
+        "kind": "project",
+        "lines": 67
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/backtrack/backtrack.cpp",
+        "bytes": 9215,
+        "sha256": "eeca47e1dc428994bea0cbf7d6d4e2500b84d61127775c98322e06d9bf45f743",
+        "kind": "project",
+        "lines": 330
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/backtrack/backtrack.h",
+        "bytes": 2124,
+        "sha256": "a1ff7c375677ef8dcc76c1b151b236dc634cf0af107db6f0b2c73d8024e940e0",
+        "kind": "project",
+        "lines": 52
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/bomb/bomb.cpp",
+        "bytes": 10302,
+        "sha256": "db697e0bdc03c5ae2d3c4647812a43282709917cffa431fbf58bd84d473d2676",
+        "kind": "project",
+        "lines": 374
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/bomb/bomb.h",
+        "bytes": 693,
+        "sha256": "a74f0c279c68e3a4aa14642df3b469a3d31d007d29844e334a388847fcc3b847",
+        "kind": "project",
+        "lines": 25
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/bones/bones.cpp",
+        "bytes": 65434,
+        "sha256": "6c2118786aee33497f89f3e9b6fecc274e6ad43a8eca2e844a4fbc4edb7ce5bc",
+        "kind": "project",
+        "lines": 2147
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/bones/bones.h",
+        "bytes": 8532,
+        "sha256": "a1f4dd5f36c4edb601f75c7f12b4cd8b8703c27f076c54dd5a8e52a11074ef35",
+        "kind": "project",
+        "lines": 218
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/bullet_impact/bullet_impact.cpp",
+        "bytes": 13645,
+        "sha256": "580a9c176e4fd4139b58f4b1162bafde5263ef9acd380e749b3be6db5c964f41",
+        "kind": "project",
+        "lines": 437
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/bullet_impact/bullet_impact.h",
+        "bytes": 1049,
+        "sha256": "f322801398236729c98d44dc1a319af157a1470dedb4d94a60468ce8d1951867",
+        "kind": "project",
+        "lines": 28
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/chams/chams.cpp",
+        "bytes": 44423,
+        "sha256": "9d45789e5153abe2ae51eeb81b2234f178fd1c534d003857a00a546512158ad3",
+        "kind": "project",
+        "lines": 1331
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/chams/chams.h",
+        "bytes": 5202,
+        "sha256": "287337439daadec3eef3c9c6fd994745367b1f38905b713e454ae7d815b6be26",
+        "kind": "project",
+        "lines": 151
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/cl_bypass/cl_bypass.cpp",
+        "bytes": 14081,
+        "sha256": "590cbe5a74240ff991c0687d6567df55db8317e44079462254f9b52021317979",
+        "kind": "project",
+        "lines": 475
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/cl_bypass/cl_bypass.h",
+        "bytes": 1315,
+        "sha256": "ea09e95fdd7d636d669ab3b6efb50359356cb7dd2dc3e20142b01dd7d293b03d",
+        "kind": "project",
+        "lines": 31
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/custom_paint/custom_paint.cpp",
+        "bytes": 12792,
+        "sha256": "d8f754f26a88501b064f7d3199a3a2ae93b7cf886ddb73eab3fb707d851b7942",
+        "kind": "project",
+        "lines": 309
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/custom_paint/custom_paint.h",
+        "bytes": 1981,
+        "sha256": "d1fbdb52cc5e6aec08f09c7e91720c440682f9c0657f5bf5323539a6e93a9c6d",
+        "kind": "project",
+        "lines": 53
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/enemy_spec/enemy_spec.cpp",
+        "bytes": 10602,
+        "sha256": "b6163114372b4c5d1fd1279cd2a2f964b835b8559614963a9b8947dfca53c90d",
+        "kind": "project",
+        "lines": 437
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/enemy_spec/enemy_spec.h",
+        "bytes": 298,
+        "sha256": "64adc5d3887208e779600ef6c98f9cbc9176c2ee64a496d084d443f823370ea0",
+        "kind": "project",
+        "lines": 12
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/engine2/engine2.cpp",
+        "bytes": 7175,
+        "sha256": "630650a68c361a667300ecbdc9fa92fb35b260c298e9d564bc8c3071cad99b7e",
+        "kind": "project",
+        "lines": 311
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/engine2/engine2.h",
+        "bytes": 1154,
+        "sha256": "da3da092bdab6b49f0982a8d4d4da8272f17b4a65b15e7182f897bfc1393d2c5",
+        "kind": "project",
+        "lines": 40
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/gamemode/gamemode.cpp",
+        "bytes": 19004,
+        "sha256": "29ba0ff58486d1b41c8bfb778a8537d57106ca312537fcb383e0e34459b4c482",
+        "kind": "project",
+        "lines": 693
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/gamemode/gamemode.h",
+        "bytes": 873,
+        "sha256": "d0f2239c3775621b5862586c0a61658b9bcea063456ddbb87ec2a2abfbbb18ec",
+        "kind": "project",
+        "lines": 33
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/glow/glow.cpp",
+        "bytes": 23266,
+        "sha256": "000ea7b76fc4d088ff3013292a3f2b4fc456df6469f5325a1416b4e6767e3069",
+        "kind": "project",
+        "lines": 802
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/glow/glow.h",
+        "bytes": 4357,
+        "sha256": "82a2f0e46478318e67e43023783a67a65ceff64b840f69589f959aff891422d4",
+        "kind": "project",
+        "lines": 139
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/grenade_helper/grenade_helper.cpp",
+        "bytes": 86806,
+        "sha256": "0127fb0c765e3c3dda64800b017e6a88caf8cd410a5370fd3e7e35514fe63149",
+        "kind": "project",
+        "lines": 2970
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/grenade_helper/grenade_helper.h",
+        "bytes": 2583,
+        "sha256": "8f27b5274302bf4f184c614fc7b26aba315f730d3827ac570ba1e46341af875f",
+        "kind": "project",
+        "lines": 87
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/hitchance/hitchance.cpp",
+        "bytes": 49000,
+        "sha256": "e92aa4095ee873317fb59407b1e805375038578c8f1969ecd776db201aa9393f",
+        "kind": "project",
+        "lines": 1637
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/hitchance/hitchance.h",
+        "bytes": 5995,
+        "sha256": "8a8e82add77238ee76b85dfa5b85e0566c90c39b8a8f7c0450564a31e1c15dbe",
+        "kind": "project",
+        "lines": 177
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/hitlog/hitlog.cpp",
+        "bytes": 15297,
+        "sha256": "274cb6e202b4127df4cfc24cd7f2d157279e00187df4695cae14f1a512193d8e",
+        "kind": "project",
+        "lines": 677
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/hitlog/hitlog.h",
+        "bytes": 590,
+        "sha256": "361959259302a209fba4287e071ed25c69f3bb88a89fa682fbb1d2d79e449dfb",
+        "kind": "project",
+        "lines": 26
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/hitmarker/hitmarker.cpp",
+        "bytes": 24768,
+        "sha256": "e198edc5080bd974c453530aec881615d854292ddcc095abcded98c8ed5dc48f",
+        "kind": "project",
+        "lines": 777
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/hitmarker/hitmarker.h",
+        "bytes": 766,
+        "sha256": "9360178417c232bf5196710024ec0940e202e5b2ff13e67ab4f1907d2e7f9ba3",
+        "kind": "project",
+        "lines": 24
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/hitsound/hitsound.cpp",
+        "bytes": 5988,
+        "sha256": "fabe0eebc83506b1c70d0d7a9f9b59255defcfc48e7eb31ac4e2842b3fa39683",
+        "kind": "project",
+        "lines": 288
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/hitsound/hitsound.h",
+        "bytes": 804,
+        "sha256": "19c0cb069c39db9ea80f90f4db95a71b47d3a240a1e5fc4d701e5cd83d26b34d",
+        "kind": "project",
+        "lines": 29
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/input_inject/input_inject.cpp",
+        "bytes": 15312,
+        "sha256": "e8d95642d93d1fe07b42bfd6573374576373f8359b13c240b506b22e474cc9bd",
+        "kind": "project",
+        "lines": 547
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/input_inject/input_inject.h",
+        "bytes": 3430,
+        "sha256": "fae4a1382c8eae5384a4b85217e47f4c6bf74d8a17e87cf422daa2cd540f0655",
+        "kind": "project",
+        "lines": 100
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/movement/fastladder.cpp",
+        "bytes": 3146,
+        "sha256": "ebf65692380d923036b04e47328e679cb50d527527fef6e1f15f312fe8d4080f",
+        "kind": "project",
+        "lines": 165
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/movement/fastladder.h",
+        "bytes": 505,
+        "sha256": "9d3ead0a4eb7daf098edcffb40372997ec6c90d914d256c6e0b58d1cf08312ce",
+        "kind": "project",
+        "lines": 18
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/movement/jumpbug.cpp",
+        "bytes": 18775,
+        "sha256": "5969dff2d85d4a70d44349388f3b36d4076d54ac562ebcde3dc3aef26ee1d5c7",
+        "kind": "project",
+        "lines": 671
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/movement/jumpbug.h",
+        "bytes": 527,
+        "sha256": "772b8ab48ee190fa043e3f41d3196e9039a4dd09a8c5bf94fcc8add3d8f33dcb",
+        "kind": "project",
+        "lines": 22
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/movement/move_helpers.h",
+        "bytes": 2090,
+        "sha256": "358ae9d899194a0faadd6e2b1163204902e2ef9a59c0ec4ec4ca8601a9defe81",
+        "kind": "project",
+        "lines": 74
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/movement/movement.cpp",
+        "bytes": 8896,
+        "sha256": "3340d657b9b52c0dec775b243f30f11cf617c1aa2b9e5615132b1f631777bcb6",
+        "kind": "project",
+        "lines": 311
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/movement/movement.h",
+        "bytes": 376,
+        "sha256": "cb12ad038fbe9a0802043239493b5668b62bdebf2ba00c33cea3707aa4ffff9b",
+        "kind": "project",
+        "lines": 16
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/nadepred/nadepred.cpp",
+        "bytes": 37334,
+        "sha256": "49fc9115b150140a82b2c514a81a622a7e2bd7926f477c353fafb5acabaf9ccc",
+        "kind": "project",
+        "lines": 1040
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/nadepred/nadepred.h",
+        "bytes": 1916,
+        "sha256": "0ac6a2ddb7f5d370e7dd8f439be830878b660c8481d41a509c6bfa1135c9cc4a",
+        "kind": "project",
+        "lines": 61
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/nospread/nospread.cpp",
+        "bytes": 48690,
+        "sha256": "022aa4b9aecadb8f38ddce316b599fd017ba967753ae2920f8b63108684843d7",
+        "kind": "project",
+        "lines": 1697
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/nospread/nospread.h",
+        "bytes": 5835,
+        "sha256": "d2cb704992adc5b203c0c708a4e13f00c95ee18861c5630c5e0a719c0f2d1bc4",
+        "kind": "project",
+        "lines": 199
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/notify/notify.cpp",
+        "bytes": 20686,
+        "sha256": "e415ba70aea57ce9d78465ff3e9875b1c0998c5701f650f68ce1fbcaee132dc7",
+        "kind": "project",
+        "lines": 801
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/notify/notify.h",
+        "bytes": 1326,
+        "sha256": "66a1c9c43609adc074dd2317b8928c4c3850994afad654bb14a3489bb456c4e2",
+        "kind": "project",
+        "lines": 51
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/panorama/panorama.cpp",
+        "bytes": 18444,
+        "sha256": "b85b320e4a6f6566590cd16c878dffb023a35563043e908f1133e4fb89799fe9",
+        "kind": "project",
+        "lines": 581
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/panorama/panorama.h",
+        "bytes": 1228,
+        "sha256": "9097ed157bb525395429ae63779ce8ad6a54af674d682548c5d56daf0cbde4d2",
+        "kind": "project",
+        "lines": 37
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/prediction/prediction.cpp",
+        "bytes": 49127,
+        "sha256": "e067301d087abd971102fd5e5891f8579b07e6727765c10e0222277c3f443519",
+        "kind": "project",
+        "lines": 1660
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/prediction/prediction.h",
+        "bytes": 8138,
+        "sha256": "62317ee9a58d3ca4654837c03af4236202523378ec7c0eb367078636a1ba052b",
+        "kind": "project",
+        "lines": 220
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/scoreboard_weapons/scoreboard_weapons.cpp",
+        "bytes": 19387,
+        "sha256": "f90cf315537469f1ac8c1d47398e63e9541c98d82e5a2df40ef72e9e7d8a6f93",
+        "kind": "project",
+        "lines": 650
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/scoreboard_weapons/scoreboard_weapons.h",
+        "bytes": 176,
+        "sha256": "a3f01da809e6ac2abb36648e87dccbeade7965250711e23610d6ff41f405f1cd",
+        "kind": "project",
+        "lines": 10
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/sdk_prio_a/sdk_prio_a.cpp",
+        "bytes": 17326,
+        "sha256": "835ce51568676994cb127b2557768fc93c86764741e03ec5ed35cf7e5cbacee9",
+        "kind": "project",
+        "lines": 571
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/sdk_prio_a/sdk_prio_a.h",
+        "bytes": 2467,
+        "sha256": "b0eb929719970eec0a5d0e8b793b0e7f5d635c72bf1be4670d56d24413a75981",
+        "kind": "project",
+        "lines": 69
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/skinchanger/skin_items.cpp",
+        "bytes": 18432,
+        "sha256": "ef8720edb5d1bcf11259c1648511556a7831a0ee15b7979f8042045fd824520a",
+        "kind": "project",
+        "lines": 575
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/skinchanger/skin_items.h",
+        "bytes": 1627,
+        "sha256": "08018695bfc7e5c8faf0d8224037f8a11db14e4c8a52adb70dc06293136ae282",
+        "kind": "project",
+        "lines": 74
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/skinchanger/skin_menu.cpp",
+        "bytes": 30537,
+        "sha256": "36343d940c75153f4495830a57f01e8048ccad59414990d3832c63931b4d6f26",
+        "kind": "project",
+        "lines": 880
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/skinchanger/skin_menu.h",
+        "bytes": 51,
+        "sha256": "5fd5a2e50a20efd90d9f3a3eb4031bb2748a9987173df81cb85942ca84183986",
+        "kind": "project",
+        "lines": 7
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/skinchanger/skin_preview.cpp",
+        "bytes": 12630,
+        "sha256": "3690e7dd69a3b7bbe31ab8a262dd94a0756e2b5b97780995e957510dfa261e64",
+        "kind": "project",
+        "lines": 404
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/skinchanger/skin_preview.h",
+        "bytes": 419,
+        "sha256": "e09b930209f8b1cf4d67ff1820232676d70da50a62af9ea08c48a899cd8be761",
+        "kind": "project",
+        "lines": 18
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/skinchanger/skin_sdk.cpp",
+        "bytes": 27126,
+        "sha256": "edc3c13414b51b9596da688d727ed345c7be2e193f7fef3c0e41f69f45346336",
+        "kind": "project",
+        "lines": 774
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/skinchanger/skin_sdk.h",
+        "bytes": 4036,
+        "sha256": "6452dbe9c1b94d63f30bf13dc7e6a3c22271b6ef65a10c4f23a755d1dc12e60d",
+        "kind": "project",
+        "lines": 150
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/skinchanger/skinchanger.cpp",
+        "bytes": 48018,
+        "sha256": "6226ce606f59762f2d090a1ed719c878de5fbd36aafd8b4b18df5650c0a75330",
+        "kind": "project",
+        "lines": 1177
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/skinchanger/skinchanger.h",
+        "bytes": 424,
+        "sha256": "958adf8cc975da45a5f1af768b7200a639a87f466fb7273dfa4aeaac4cd26bc7",
+        "kind": "project",
+        "lines": 18
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/sound_esp/sound_esp.cpp",
+        "bytes": 10526,
+        "sha256": "34fbeb4f110a3d831004d3ada1c3237d2664d000edeaffe9dafa72260ca5373f",
+        "kind": "project",
+        "lines": 430
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/sound_esp/sound_esp.h",
+        "bytes": 372,
+        "sha256": "9d4711361a9d90bdf582e70f605a41af6f09f4c82ccdd2b5ec4bde73e15f3ff3",
+        "kind": "project",
+        "lines": 15
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/subtick_move/subtick_move.cpp",
+        "bytes": 24695,
+        "sha256": "e844ed5551070050268e5497f34122611add8036799467893e919e39f9639c12",
+        "kind": "project",
+        "lines": 698
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/subtick_move/subtick_move.h",
+        "bytes": 647,
+        "sha256": "ca8bc1ebbaf9030f05fe604625f8504339cf275e5be203629990697a9e34420a",
+        "kind": "project",
+        "lines": 22
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/trace/trace.cpp",
+        "bytes": 21230,
+        "sha256": "c1ba54c6a1816b8e0ecffbb2ef15e4563307aec08d9cc7058cd5c4d5ae22b043",
+        "kind": "project",
+        "lines": 755
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/trace/trace.h",
+        "bytes": 5493,
+        "sha256": "c345438704b12b9262290aa05c463c048266fca3670ca0c079b5fe689bc59207",
+        "kind": "project",
+        "lines": 156
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/triggerbot/triggerbot.cpp",
+        "bytes": 64986,
+        "sha256": "1399de6ce2e69e845bd366a1e5b4a145ee49a21d43b1e83c5adb74d13c41da32",
+        "kind": "project",
+        "lines": 2409
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/triggerbot/triggerbot.h",
+        "bytes": 436,
+        "sha256": "885df1d06febd4e972fa5be5200f754268ca2fc75fcc6baaa84a297043a582cf",
+        "kind": "project",
+        "lines": 24
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/visuals/antiflash/antiflash.cpp",
+        "bytes": 1699,
+        "sha256": "07c75c13547950f9b33f5c14a8887a46a77e9ef8178cf9b42da7308980558e6e",
+        "kind": "project",
+        "lines": 48
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/visuals/assets/undefeated_font.hpp",
+        "bytes": 296059,
+        "sha256": "3ac1e550e40da4d50a7fe353f764f35dcaf49544d64a93727c13de01d20e2cfa",
+        "kind": "project",
+        "lines": 2968
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/visuals/assets/weapon_icon_atlas.hpp",
+        "bytes": 1459510,
+        "sha256": "486fb9b85a8f077c9ae1d288a24a1fe268cec5d20aa4c71498c3db8eb5a3ebea",
+        "kind": "project",
+        "lines": 14981
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/visuals/assets/weapon_icons.hpp",
+        "bytes": 4718,
+        "sha256": "d2e95c6dd12ab077c55776c846821f85c4c9a2ddfaca5d985f83d0c767af8c04",
+        "kind": "project",
+        "lines": 109
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/visuals/fov/fov.cpp",
+        "bytes": 7124,
+        "sha256": "feaf66f61b87568deae3eb0aeef350100778451478376472f7bd67506ec6de4f",
+        "kind": "project",
+        "lines": 225
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/visuals/removals/removals.cpp",
+        "bytes": 24006,
+        "sha256": "89a96ed123b67daa934a9af47d805319239026b28da3cdd0d098699e3ee8b131",
+        "kind": "project",
+        "lines": 690
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/visuals/scope/scope.cpp",
+        "bytes": 5867,
+        "sha256": "53052d6cad0b1daedf934d98bfe86772bf80b0271d9cfd1f78cc40ec50da109d",
+        "kind": "project",
+        "lines": 265
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/visuals/scope/scope.h",
+        "bytes": 507,
+        "sha256": "20e1491228e71272db26be04f3747e5fc28646a4a6ddcceb5737ceffe1ac7faa",
+        "kind": "project",
+        "lines": 17
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/visuals/visuals.cpp",
+        "bytes": 156806,
+        "sha256": "e5c211ea92456b104c1cf7265378a92105338f92f59aba24dd9e4e951543ab60",
+        "kind": "project",
+        "lines": 4274
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/visuals/visuals.h",
+        "bytes": 4638,
+        "sha256": "445da0635614054dc031f398c7cd34bd71c14159032fb30896e170e87b52e90b",
+        "kind": "project",
+        "lines": 159
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/visuals/weapon_icon_draw.cpp",
+        "bytes": 5105,
+        "sha256": "e7ea32bc1adb1c53a1bf3dc8ad2c88622fbdb742c136bfe676b39aaa1f021943",
+        "kind": "project",
+        "lines": 188
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/visuals/weapon_icon_draw.h",
+        "bytes": 521,
+        "sha256": "209858eaa5d35ea208afbeb112257098b283228b7ca05ac94c2d30c323dd5ebc",
+        "kind": "project",
+        "lines": 18
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/vote/vote.cpp",
+        "bytes": 9244,
+        "sha256": "a22b60578da87d320e50a987894c6732a6c45bae357cb2336750b1340517fbce",
+        "kind": "project",
+        "lines": 378
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/vote/vote.h",
+        "bytes": 297,
+        "sha256": "37121415cea09b5750a306fd24d5613ffb40a7b28e60ec7a04f92d8315936431",
+        "kind": "project",
+        "lines": 13
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/w2s/w2s.cpp",
+        "bytes": 10565,
+        "sha256": "96358a5688c490932ac31856291f27f5f66d4730b049aaa1278a6aaaddc8d1b2",
+        "kind": "project",
+        "lines": 391
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/w2s/w2s.h",
+        "bytes": 1243,
+        "sha256": "82c762e58f963866fcc821959db1723537fc405ef2f33b454ab0c2a25888c568",
+        "kind": "project",
+        "lines": 38
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/widgets/steam_avatar.cpp",
+        "bytes": 5939,
+        "sha256": "7fd53aab0ac0e5bac35853c48d2dbb0b9b89eb572555f066b7ed9aa4c84748e4",
+        "kind": "project",
+        "lines": 210
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/widgets/steam_avatar.h",
+        "bytes": 310,
+        "sha256": "dd7a4b7345816697bad490ca52b42828d06e884aecf2b1b719ff6582b697bd3e",
+        "kind": "project",
+        "lines": 13
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/widgets/widgets.cpp",
+        "bytes": 52010,
+        "sha256": "8daa7f891ba281908d1d4208e971114768f9af2c39b351eece8e30c7841a5eea",
+        "kind": "project",
+        "lines": 1553
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/widgets/widgets.h",
+        "bytes": 74,
+        "sha256": "3f8624e7569d84167dda1a81243e0ce36f0f44e869111de5655bf8a7869fb51d",
+        "kind": "project",
+        "lines": 8
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/world/fog_handler.cpp",
+        "bytes": 3616,
+        "sha256": "cd371a8f56279b23fb67cd9bba98833e1ee8445fc1a23930d55b2123f005d44b",
+        "kind": "project",
+        "lines": 124
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/world/fog_handler.h",
+        "bytes": 321,
+        "sha256": "688e1d97e4e5ff0e2772d50c8e52726ace1180351a1a232d6cbfe84cd9011b8c",
+        "kind": "project",
+        "lines": 12
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/world/weather.cpp",
+        "bytes": 41612,
+        "sha256": "920ea5beda32575dff6901891f08aea031f0b5235e6d3571a25d9c63300a6ee6",
+        "kind": "project",
+        "lines": 1262
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/world/weather.h",
+        "bytes": 777,
+        "sha256": "fdb3de9970543071c1ceb0abcf37d44a1ee17992aa10c42f890801280a0b20cd",
+        "kind": "project",
+        "lines": 24
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/world/world.cpp",
+        "bytes": 66544,
+        "sha256": "401d51bef390c0e39c594fb9e7a0aa9191405e28f5806b0b8e359f70bb1fb1c3",
+        "kind": "project",
+        "lines": 2017
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/world/world.h",
+        "bytes": 759,
+        "sha256": "44748b631d0d0d2ef66ee371b78be10de8098fad6a2df0ecac59d22498a5cdbf",
+        "kind": "project",
+        "lines": 26
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/features/world/world_particle_assets.hpp",
+        "bytes": 122285,
+        "sha256": "b67fa30f384916877111eda2c569604ad2f60137f71413c036681745f8f8817f",
+        "kind": "project",
+        "lines": 1199
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/hooks/hooks.cpp",
+        "bytes": 63231,
+        "sha256": "459b7fd7d9d20e254a9dfb2a552a50ab6f37a0654a57508c3d0be8860ad8b3e2",
+        "kind": "project",
+        "lines": 1678
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/hooks/hooks.h",
+        "bytes": 12419,
+        "sha256": "980642177eb53bcb85a52173bfe5224dfdcf07e49c80b29f7ec4b2687c6464c8",
+        "kind": "project",
+        "lines": 238
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/hooks/includeHooks.h",
+        "bytes": 2074,
+        "sha256": "8631ff85c52e67228da773432a6b34ade97ace6e05b5ef311426e8ce37bdc3a0",
+        "kind": "project",
+        "lines": 86
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/interfaces/CCSGOInput/CCSGOInput.h",
+        "bytes": 2768,
+        "sha256": "e6aed84507014d3e383b715b655526b08e99e51fff511d89efc9c123fd5edfc0",
+        "kind": "project",
+        "lines": 88
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/interfaces/CGameEntitySystem/CGameEntitySystem.cpp",
+        "bytes": 1101,
+        "sha256": "468f8355635e4ba5b4477acff518357f095cbf78877530e35dba43d02a21b451",
+        "kind": "project",
+        "lines": 48
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/interfaces/CGameEntitySystem/CGameEntitySystem.h",
+        "bytes": 2964,
+        "sha256": "207f6328291b0e9f800d38734cf052fff6c800833395ac959bb3538ed8cd9c05",
+        "kind": "project",
+        "lines": 118
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/interfaces/CUserCmd/CUserCmd.h",
+        "bytes": 23201,
+        "sha256": "489a130b8e9f930a4f9483face1014b4cf1edbea892aaf4d3d5f70dcb295497a",
+        "kind": "project",
+        "lines": 649
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/interfaces/IEngineClient/IEngineClient.h",
+        "bytes": 4812,
+        "sha256": "f76db04388be08f52102c3a9ed060227e5043c75ec77bd81ee8e99b861dc0025",
+        "kind": "project",
+        "lines": 197
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/interfaces/interfaces.cpp",
+        "bytes": 13016,
+        "sha256": "a085aff768475764e550b7d66619c986bdf049a54204ca5ac5ae513855ceb2b1",
+        "kind": "project",
+        "lines": 363
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/interfaces/interfaces.h",
+        "bytes": 1576,
+        "sha256": "30c1d0584ba72c83c8ec0c17426732089645cca7cc8de97add1107bb81949446",
+        "kind": "project",
+        "lines": 35
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/keybinds/keybinds.cpp",
+        "bytes": 13964,
+        "sha256": "1470b7ea29bd73764bf26c19cbd89a2614f7b163e8384ffbedb091064f64ebcf",
+        "kind": "project",
+        "lines": 584
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/keybinds/keybinds.h",
+        "bytes": 2010,
+        "sha256": "ac8165e0bddd79824a8a3b5cbd634afd5fbad7e32c3a9769dbc6ce506237b383",
+        "kind": "project",
+        "lines": 80
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/lefrizzel Ai.cpp",
+        "bytes": 3988,
+        "sha256": "78c46eb8080006774331f1a32c7718e9578743c4e59a245865ee5a78cdce258f",
+        "kind": "project",
+        "lines": 124
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/lefrizzel Ai.h",
+        "bytes": 560,
+        "sha256": "eb9a3de8c43456f4d2ca0a8ac40965fcbdda88a733db7d2ca2eaf1320e828e59",
+        "kind": "project",
+        "lines": 24
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/menu/hud.cpp",
+        "bytes": 9327,
+        "sha256": "1166b42c6c57bff668dba62ea0c5e4e39fddb971445f5ac8b39e8aa1f02635a3",
+        "kind": "project",
+        "lines": 251
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/menu/hud.h",
+        "bytes": 67,
+        "sha256": "52d93c6ec11ab144ce002801789aff14e6b5eeb2152b9807b081e2e19ab4fbac",
+        "kind": "project",
+        "lines": 8
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/menu/icons/fa-solid-900.ttf",
+        "bytes": 430047,
+        "sha256": "69950dd648f17dd74e99f933430e5c7971fd34f4a89a69689842766e5c121a2e",
+        "kind": "project",
+        "lines": null
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/menu/icons/fa_solid_font.hpp",
+        "bytes": 18600,
+        "sha256": "30b1716211f1ee0587f0bd02fd9235862e222735c99201c62a5b4eab575239e3",
+        "kind": "project",
+        "lines": 194
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/menu/menu.cpp",
+        "bytes": 101521,
+        "sha256": "355ac2b6bb84c5535262f45daf61921b95970b889783011aa0c8decf8d40946e",
+        "kind": "project",
+        "lines": 2057
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/menu/menu.h",
+        "bytes": 796,
+        "sha256": "1398df3629c768434fc8a681281daeb660cda8293b3e2bc9dc609e626f619bf8",
+        "kind": "project",
+        "lines": 27
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/menu/menu_ui.cpp",
+        "bytes": 37565,
+        "sha256": "cc3868c57adde19f3a346bd49a179d2cd36ef47cc999e75b075a5a3517e4afac",
+        "kind": "project",
+        "lines": 942
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/menu/menu_ui.h",
+        "bytes": 5203,
+        "sha256": "a77052ab53ac89956b2bc211fd81954e32034a6ddf49ff1584248b3299575cb1",
+        "kind": "project",
+        "lines": 159
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/offsets/offsets.h",
+        "bytes": 8353,
+        "sha256": "0db1503cc50184c38bcd4aa441cf462a8c875c7fddc086f82f2a5f25956f1ef0",
+        "kind": "project",
+        "lines": 230
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/renderer/icons.h",
+        "bytes": 405423,
+        "sha256": "91a4048ada23da8abdefd5efde66208813223a0705a3729a9fa3692aec182427",
+        "kind": "project",
+        "lines": 5546
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/renderer/renderer.h",
+        "bytes": 181,
+        "sha256": "39ff69c7c1e543f6da810b4b1ec3ddef89bf120bf59d74ba8968cf72e8fa25a5",
+        "kind": "project",
+        "lines": 14
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/utils/console/console.cpp",
+        "bytes": 29455,
+        "sha256": "5cdd2b56490b296cf45f285f448704eea4ad13927e4381125521d5f24b8af9ea",
+        "kind": "project",
+        "lines": 1197
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/utils/console/console.h",
+        "bytes": 6516,
+        "sha256": "b357368780af41566361e2de8842f58b97a240bea3563d3294f6a0a2465390bb",
+        "kind": "project",
+        "lines": 187
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/utils/crypto/xorstr.h",
+        "bytes": 2137,
+        "sha256": "7342cd6586155ee18328c87bca8a01e32d3dd3fc2d25fab9530e41e02690b681",
+        "kind": "project",
+        "lines": 64
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/utils/cvar/cvar.cpp",
+        "bytes": 4313,
+        "sha256": "ff1f20f13b4c69bac6672727814aef2fe0ad62712324abe9bec8815d81a645de",
+        "kind": "project",
+        "lines": 150
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/utils/cvar/cvar.h",
+        "bytes": 605,
+        "sha256": "13d82117f54b6cb7f91715348de91a4ea0f2dfd0bf7a30644cd78a75d7445ae0",
+        "kind": "project",
+        "lines": 17
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/utils/fnv1a/fnv1a.h",
+        "bytes": 709,
+        "sha256": "9ffb34308a080b9ed9811bd6eae5fa4f5bcd7543be3ba279520f5e1095f6e9e1",
+        "kind": "project",
+        "lines": 22
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/utils/logging/log.cpp",
+        "bytes": 2030,
+        "sha256": "183bb43b4f617d15bd8bce26d0afb84e492a9673a406cfe562b8efb7d7a2de83",
+        "kind": "project",
+        "lines": 42
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/utils/logging/log.h",
+        "bytes": 272,
+        "sha256": "ed1b6bf3822ed984ec22e192a2a956ea47dd4506eefd3d932b63dc64bdf59ce3",
+        "kind": "project",
+        "lines": 18
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/utils/math/utlmemory/utlmemory.h",
+        "bytes": 12046,
+        "sha256": "91d3f34ecc7572832f4bbfc8efcc5ff4c7cafd6d3108d54ac1ce21a56ea8c762",
+        "kind": "project",
+        "lines": 617
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/utils/math/utlstring/utlstring.h",
+        "bytes": 1593,
+        "sha256": "0bc0b852a315d07d6a3bdb0d64e5bffc3ee5a416d81e07345645ff4769296279",
+        "kind": "project",
+        "lines": 61
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/utils/math/utlstronghandle/utlstronghandle.h",
+        "bytes": 390,
+        "sha256": "7ae1bfadb02fb99a87e8df508e8a1f812a460715299986081449139792dec77f",
+        "kind": "project",
+        "lines": 31
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/utils/math/utlvector/utlvector.h",
+        "bytes": 6794,
+        "sha256": "83fadbb8208a0452a1692c81b261c5800d0ff8308e77aed0013533ff09ca114a",
+        "kind": "project",
+        "lines": 341
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/utils/math/vector/vector.cpp",
+        "bytes": 982,
+        "sha256": "8cca4017eb4391fca6ce758b43b7c025f8f039e4dfdafe4d492bd912ae755356",
+        "kind": "project",
+        "lines": 45
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/utils/math/vector/vector.h",
+        "bytes": 9559,
+        "sha256": "9d296348dde1b0a818d9e9189ce5a965e54555c21b37493b9e4b51576a4dca5a",
+        "kind": "project",
+        "lines": 408
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/utils/math/viewmatrix/viewmatrix.cpp",
+        "bytes": 1785,
+        "sha256": "b9e4904273fa74146bb2a24af287b0c854987f47ada75acadb1b646ad3cf48fd",
+        "kind": "project",
+        "lines": 55
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/utils/math/viewmatrix/viewmatrix.h",
+        "bytes": 712,
+        "sha256": "19048a55968db173a86b2ce8fb309fbb49a9e548114f3927fcbefd5f4eeeb077",
+        "kind": "project",
+        "lines": 19
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/utils/memory/gaa/gaa.cpp",
+        "bytes": 516,
+        "sha256": "d3dc1275f00b80810d612b10240c982665b246ec71423df9df2abdb30c26a314",
+        "kind": "project",
+        "lines": 21
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/utils/memory/gaa/gaa.h",
+        "bytes": 144,
+        "sha256": "df2c1f8d5c13cadccd9784aac04f860b3034a4e8c7e33e46e50e044665b6f609",
+        "kind": "project",
+        "lines": 6
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/utils/memory/Interface/Interface.h",
+        "bytes": 2016,
+        "sha256": "a8bb2a1151fb5b3ce1cdffc80467ddb7bdc8b16192bdcc4ec27477bccbf654b0",
+        "kind": "project",
+        "lines": 70
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/utils/memory/memorycommon.h",
+        "bytes": 208,
+        "sha256": "c9c895c8923df424b1092a5fb716b4763469966264d81020cdd227f217d7a94f",
+        "kind": "project",
+        "lines": 10
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/utils/memory/memsafe/memsafe.cpp",
+        "bytes": 1882,
+        "sha256": "2e1cc82a5f91fc8d93d34e457d5667d4ddb0f9533ff6d288f83cc5842c15c11e",
+        "kind": "project",
+        "lines": 72
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/utils/memory/memsafe/memsafe.h",
+        "bytes": 7264,
+        "sha256": "641f5930e12d37f2fd10cef8165c6322a8a1a66fbfa669750d603f44b3812d12",
+        "kind": "project",
+        "lines": 255
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/utils/memory/patternscan/patternscan.cpp",
+        "bytes": 9222,
+        "sha256": "8bc4df1b6e3e21a347a6016389d25f4efa9c8ac316208623e32cf3f8119ba772",
+        "kind": "project",
+        "lines": 368
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/utils/memory/patternscan/patternscan.h",
+        "bytes": 2794,
+        "sha256": "34663724633837fb90dba6f018dd5560e1815f0f9953e17b4089e4400c7060f7",
+        "kind": "project",
+        "lines": 105
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/utils/memory/vfunc/vfunc.h",
+        "bytes": 1389,
+        "sha256": "a1a06f370a6d1ca19009d6d4d164ff4f603a9afb0b2495aa60fe7bed801dce66",
+        "kind": "project",
+        "lines": 54
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/utils/module/module.cpp",
+        "bytes": 3064,
+        "sha256": "6742cf86d33c97a7b95871a0580f583849f573278b380e6a67531c71df5c7b2a",
+        "kind": "project",
+        "lines": 112
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/utils/module/module.h",
+        "bytes": 624,
+        "sha256": "958d42b34cad247c19114ad105791b92d128c9ebb7e1d617c5e711e4ee2e4092",
+        "kind": "project",
+        "lines": 35
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/utils/schema/schema.cpp",
+        "bytes": 4892,
+        "sha256": "55245fb3130f5bac36514a7a9c2c517cf3c936cb153642733c60d40df27433cb",
+        "kind": "project",
+        "lines": 154
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/utils/schema/schema.h",
+        "bytes": 7603,
+        "sha256": "be31fa9752c17927fde2d48dff18e422a5e34003630471aad73fc099d07f354f",
+        "kind": "project",
+        "lines": 121
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/utils/security/crashdump.cpp",
+        "bytes": 7745,
+        "sha256": "66a908e9354ce8542c28123d5630facd73e46397acb4f87560c0c18c7e009e66",
+        "kind": "project",
+        "lines": 257
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/utils/security/crashdump.h",
+        "bytes": 211,
+        "sha256": "886938c71b7b4449ea74c813afedc1c6078537f1ac47c8d52e9cfb4dfeff4c1e",
+        "kind": "project",
+        "lines": 10
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/utils/security/secure_allow.h",
+        "bytes": 306,
+        "sha256": "7aa6a045b0c32a1c465562fcd8dfca4fb830ad0cfaea133f419d7380b577e210",
+        "kind": "project",
+        "lines": 9
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/utils/security/sehsupport.cpp",
+        "bytes": 4396,
+        "sha256": "ecc17a5c483c3441a154836b36dd2dfb4344440acdc1d1692cb2d9006cafcdc8",
+        "kind": "project",
+        "lines": 123
+      },
+      {
+        "path": "Lefrizzel AI/source/lefrizzel Ai/utils/security/sehsupport.h",
+        "bytes": 1848,
+        "sha256": "314460497d993862650cc0196789aa7af706d41b202e645173d766f1edbe919e",
+        "kind": "project",
+        "lines": 42
+      },
+      {
+        "path": "Lefrizzel AI/source/main.cpp",
+        "bytes": 37739,
+        "sha256": "28dfb6719d2fb85e9a1120f1280aa0431eeaeae5d436aaf27b8ad672d2f64587",
+        "kind": "project",
+        "lines": 995
+      },
+      {
+        "path": "Lefrizzel-Ai.sln",
+        "bytes": 1422,
+        "sha256": "9e04e2098df9a365f6719b0c3dcccbd99a85776f4318bbbb1a2455e8fe3a3125",
+        "kind": "project",
+        "lines": 32
+      },
+      {
+        "path": "LICENSE",
+        "bytes": 1069,
+        "sha256": "7f4987e7d467cc37f3b659d53cad0eba4bb858e0976e3265784398b529cfd688",
+        "kind": "project",
+        "lines": 22
+      },
+      {
+        "path": "README.md",
+        "bytes": 2437,
+        "sha256": "4bafc9d0543ed0c9a19a0b120b61f376b90e76b758befe8a787dc3b6e26a081e",
+        "kind": "project",
+        "lines": 57
+      }
+    ],
+    "total": 230,
+    "project_files": 207
+  },
+  "Jeremy": {
+    "files": [
+      {
+        "path": ".gitattributes",
+        "bytes": 66,
+        "sha256": "1a1dbe176bc233b499d35a57db7513f2941c99ab9759f177830c9149be99005b",
+        "kind": "project",
+        "lines": null
+      },
+      {
+        "path": ".gitignore",
+        "bytes": 794,
+        "sha256": "655db99e8d2c247a8d806a526f9accf8bfb2a0427f0cc8736f6da5db056db3ff",
+        "kind": "project",
+        "lines": null
+      },
+      {
+        "path": "cs2/velocity-cs2/.editorconfig",
+        "bytes": 3337,
+        "sha256": "ac61a49bf8cd21591c9688b28d354d80c3e0270420a8aafbdd7b37314f6cbe3f",
+        "kind": "project",
+        "lines": null
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/changer/changer.hpp",
+        "bytes": 8454,
+        "sha256": "c699c5d29b860ef21dab6c1ac89144a536498cb656a75fa38e1e08d80e29103a",
+        "kind": "project",
+        "lines": 282
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/changer/impl/agents.cpp",
+        "bytes": 5416,
+        "sha256": "07de68490a996341e9c37f21a9ff8091e029c012fa897591e3988cb80a831c56",
+        "kind": "project",
+        "lines": 156
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/changer/impl/econ_item_system.cpp",
+        "bytes": 26621,
+        "sha256": "38d58ea7f698fc9095c74e9b49c42f41f7bffaeab31f68a35bc9d6a686b8b1f7",
+        "kind": "project",
+        "lines": 1009
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/changer/impl/gloves.cpp",
+        "bytes": 11188,
+        "sha256": "80e1caab624706a0298e8ecfdb176046f9ab23c21e59f69729b02b878e8cf281",
+        "kind": "project",
+        "lines": 295
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/changer/impl/guns.cpp",
+        "bytes": 8043,
+        "sha256": "f7bd0f756d3f530bcf38f0e31cc223a828a394ea88f867e5131a5339cf9b92cd",
+        "kind": "project",
+        "lines": 229
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/changer/impl/knives.cpp",
+        "bytes": 13958,
+        "sha256": "4451ecdebd5896125b8f07e77a33a712d1c380b364c81db452bc8a16c9bc476d",
+        "kind": "project",
+        "lines": 369
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/combat/combat.hpp",
+        "bytes": 20001,
+        "sha256": "2b4ac58740432a053926c9f4d63b93e3b23d6268f87d4cc476ec72ac04b75911",
+        "kind": "project",
+        "lines": 552
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/combat/impl/extrapolation.cpp",
+        "bytes": 7959,
+        "sha256": "8da06085b3c648c2b1f6142cf03e34aa56d8119718fe205c3efc538557614922",
+        "kind": "project",
+        "lines": 269
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/combat/impl/legit.cpp",
+        "bytes": 25567,
+        "sha256": "5e1f1fc5c796c95730287a89f73995c90ca3d68ffaadbc3ef47a8336b421effd",
+        "kind": "project",
+        "lines": 892
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/combat/impl/misc.cpp",
+        "bytes": 29218,
+        "sha256": "8844790419bf5f5c32cddf3997ea6becb7ebb88c871349984410896640a6d1b0",
+        "kind": "project",
+        "lines": 968
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/combat/impl/rage.cpp",
+        "bytes": 66588,
+        "sha256": "d8398f3c70275cbec89a03c259841fa88883b623b16da7dda928fb0b3e56b2bd",
+        "kind": "project",
+        "lines": 2279
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/combat/impl/shared.cpp",
+        "bytes": 49347,
+        "sha256": "c23b51d6e2e4f331be56f95d80721e8d761d82c521b64d909f79bd4963560663",
+        "kind": "project",
+        "lines": 1586
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/esp/esp.hpp",
+        "bytes": 9943,
+        "sha256": "f590a7621100af95c65ae88e570f37f059f6fe0a17933cd5440ad779e753490c",
+        "kind": "project",
+        "lines": 279
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/esp/item/item.chams.cpp",
+        "bytes": 4629,
+        "sha256": "69c1d8e7b1b25ce537a99649373daa9f9bb8a7cc091008585e6629581a94a423",
+        "kind": "project",
+        "lines": 166
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/esp/item/item.glow.cpp",
+        "bytes": 3835,
+        "sha256": "fd788a991c0a2d50ea0bb1f02b9221685a01d880b027b67e8ca2e3a6bc5470f5",
+        "kind": "project",
+        "lines": 151
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/esp/item/item.overlay.cpp",
+        "bytes": 5594,
+        "sha256": "cfe29010a95f9db03d38a8e9cce8bbf2803badfd32b4034b70d63aa96e0edf01",
+        "kind": "project",
+        "lines": 199
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/esp/other/other.overlay.cpp",
+        "bytes": 21852,
+        "sha256": "2fb1403cf901a70c38cd8d9f9782a0048f6fe23a212a33a36fb094bf4e8a6673",
+        "kind": "project",
+        "lines": 537
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/esp/player/player.chams.cpp",
+        "bytes": 24421,
+        "sha256": "7a895a6c62d95fddf384d8e7643fe638ed1afb515a253b0a8015a2dfdb4f27f0",
+        "kind": "project",
+        "lines": 845
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/esp/player/player.glow.cpp",
+        "bytes": 3171,
+        "sha256": "675d2efcc2c916804d6baa085a7485b55f5e01016f3e21ec33c1cae3da4139f8",
+        "kind": "project",
+        "lines": 128
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/esp/player/player.overlay.cpp",
+        "bytes": 34805,
+        "sha256": "43f98b3ce55399a978ebf18f59e1ac697983ff4e2fb3842bc9c5abf7e1b633f0",
+        "kind": "project",
+        "lines": 957
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/esp/primitive_buffer.hpp",
+        "bytes": 4504,
+        "sha256": "dcd323a74dbaa215d489d443af1e4dae05fb382f48c8c98ae481113a19211468",
+        "kind": "project",
+        "lines": 145
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/esp/projectile/projectile.overlay.cpp",
+        "bytes": 24552,
+        "sha256": "a9782631a1141bf860363d245cd9fa9540c8f9ac6c74f02b7cf6e1470052d0bd",
+        "kind": "project",
+        "lines": 762
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/esp/projectile/projectile.tracers.cpp",
+        "bytes": 290,
+        "sha256": "3f6758d65032cc78d6ba032c64cb1d793af0001127c124fbb13f33f8115a1b41",
+        "kind": "project",
+        "lines": 10
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/features.hpp",
+        "bytes": 1853,
+        "sha256": "97fcb2a1db61ef1ad1099a5249c9b90b0004192b1a6abfe8790e94d257318348",
+        "kind": "project",
+        "lines": 99
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/misc/impl/camera.cpp",
+        "bytes": 5583,
+        "sha256": "de1a72f6ecfe2f699840729938e3892a6d37bd75a659cdb59e7c5ddbf5d3c4d9",
+        "kind": "project",
+        "lines": 151
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/misc/impl/dlight.cpp",
+        "bytes": 7824,
+        "sha256": "6df628af8a5be8e4815d5f268471699adbef9ee58d1fddb7f5ba73aba5f85d02",
+        "kind": "project",
+        "lines": 230
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/misc/impl/hud.cpp",
+        "bytes": 27473,
+        "sha256": "78507ca79c74ac9822a8f9433257022562f71d04a70e27e0d4250504c0f2701e",
+        "kind": "project",
+        "lines": 722
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/misc/impl/impacts.cpp",
+        "bytes": 71975,
+        "sha256": "b863ec853f166a1a1bb9c53e185d508645630810a2ced81c9a3f7ebcec0e0d5c",
+        "kind": "project",
+        "lines": 2206
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/misc/impl/other.cpp",
+        "bytes": 10185,
+        "sha256": "3caf80dce5ad39d82f56f0d25528a80876e10e421c3e5210f33e30faa1d3c13a",
+        "kind": "project",
+        "lines": 373
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/misc/impl/projectile.trajectory.cpp",
+        "bytes": 36613,
+        "sha256": "ac482abc91d6100819bff23ca7265607f35997f17b54bf399f3e56383bb8b48d",
+        "kind": "project",
+        "lines": 1204
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/misc/impl/removals.cpp",
+        "bytes": 1418,
+        "sha256": "7b7ee5e1967fbd1608f616214727ec621c03fb0975c52d95405d924a862a1b51",
+        "kind": "project",
+        "lines": 59
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/misc/impl/scoreboard_weapons.cpp",
+        "bytes": 16443,
+        "sha256": "96e53010f9a7a01e927706f4ed9b82c4bd0aa860510c42c54bd113f2f3f5bad7",
+        "kind": "project",
+        "lines": 521
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/misc/misc.hpp",
+        "bytes": 15427,
+        "sha256": "a468c220638c07515dade3297bebf19b182d3db27acb61d0822abd22f9870963",
+        "kind": "project",
+        "lines": 482
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/movement/impl/airstrafe.cpp",
+        "bytes": 13960,
+        "sha256": "6b7bd14a5d5912e1e24f449cac2004f97718b4b49446ad03417282c7b2b77a67",
+        "kind": "project",
+        "lines": 419
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/movement/impl/bunnyhop.cpp",
+        "bytes": 5235,
+        "sha256": "05b52397b8c2a4b1159e1d57edf0184f09b1976caf17f32ce44888013d79ea48",
+        "kind": "project",
+        "lines": 168
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/movement/impl/edgebug.cpp",
+        "bytes": 8312,
+        "sha256": "7695ebd9c27d42919e6b2071f93a60dafae02e230af45178c8217f0028b4d70d",
+        "kind": "project",
+        "lines": 262
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/movement/impl/edgejump.cpp",
+        "bytes": 4809,
+        "sha256": "ef74bb8b56715e96d313a43e8855fdb70e4376b5fc62b609f19e11de69cf106c",
+        "kind": "project",
+        "lines": 146
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/movement/impl/edgestop.cpp",
+        "bytes": 9126,
+        "sha256": "4889024e4af4342d42a2a32b0a9a5ec9f3f530034feff76758b80619a5d2b9d2",
+        "kind": "project",
+        "lines": 258
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/movement/impl/fastladder.cpp",
+        "bytes": 1961,
+        "sha256": "83a6dd5eea8e05061ebecdb3da07a9791623af8044310b015eb60892db0eacd0",
+        "kind": "project",
+        "lines": 75
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/movement/impl/jumpbug.cpp",
+        "bytes": 7391,
+        "sha256": "f8c9bf95c5c41b18be544527221d13fa6ea7b797c1269e78c903317bcd781146",
+        "kind": "project",
+        "lines": 218
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/movement/impl/slowwalk.cpp",
+        "bytes": 1234,
+        "sha256": "4ccaad32a0f444b3585cf3363ae322abc352deac5ce6146dc0558cc366026859",
+        "kind": "project",
+        "lines": 51
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/movement/impl/test_strafer.cpp",
+        "bytes": 9721,
+        "sha256": "890de5444aa69057e79e8bd3685253bc984a0e8de4218afb83f850081d976f0d",
+        "kind": "project",
+        "lines": 354
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/movement/movement.hpp",
+        "bytes": 2426,
+        "sha256": "4205f186e56d2c6c36ce732b22c182937af01ef6058abdb0b73b856980159c94",
+        "kind": "project",
+        "lines": 97
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/world/impl/scene.cpp",
+        "bytes": 20818,
+        "sha256": "ce27e72a8307a8d6d21759f06d34627995889092e73a7985d93e9b2c32b7fde2",
+        "kind": "project",
+        "lines": 583
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/world/impl/smoke.cpp",
+        "bytes": 978,
+        "sha256": "651621524d8de7daec92ac593d266f32a1be122217787a18d7313cc3f04ab7f2",
+        "kind": "project",
+        "lines": 48
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/world/impl/weather.cpp",
+        "bytes": 6587,
+        "sha256": "5cf61608922dc435e6b595c35a588589f73ce2d4f9d09ccc7a511adac8714989",
+        "kind": "project",
+        "lines": 212
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/features/world/world.hpp",
+        "bytes": 2691,
+        "sha256": "5ec350a2980e9ad39589da33f33c1653b2ce42ed3b3f62168e253623fb4309ee",
+        "kind": "project",
+        "lines": 85
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/hooks/hooks.hpp",
+        "bytes": 7645,
+        "sha256": "8bb590b25e237e07e6aa5c645da648ffac1a909cfa25bce1c8595ccb07966101",
+        "kind": "project",
+        "lines": 124
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/hooks/impl/cheat.cpp",
+        "bytes": 35446,
+        "sha256": "29f7b2eac3021601907dcddb3410272ef5042dec67f45c9158f52fec0b1700f9",
+        "kind": "project",
+        "lines": 1016
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/hooks/impl/utility.cpp",
+        "bytes": 4031,
+        "sha256": "c8aa9f45e422347ac13908fcff886001d1612023c28f01d56408f970241fa397",
+        "kind": "project",
+        "lines": 137
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/rendering/impl/context.cpp",
+        "bytes": 3796,
+        "sha256": "fc4268413d65328e2d67ed7d515bfe11689eed5102e0aa60624aedc6edfc968c",
+        "kind": "project",
+        "lines": 168
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/rendering/impl/fonts.cpp",
+        "bytes": 891,
+        "sha256": "e1ccf5078eabfcde377a115e669cd579dd966a90e7053486c279b8c45c549f69",
+        "kind": "project",
+        "lines": 24
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/rendering/impl/menu/menu.config.cpp",
+        "bytes": 8718,
+        "sha256": "eb7b0337860fe274016394bd8b2c999321de49d36bd649643f1fddba4d335bf1",
+        "kind": "project",
+        "lines": 347
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/rendering/impl/menu/menu.core.cpp",
+        "bytes": 109235,
+        "sha256": "9691eb7a5480a71be6ea1d3723b2d6a1c0f669f50bfc55aa8f53766fc1afb626",
+        "kind": "project",
+        "lines": 1846
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/rendering/impl/menu/menu.legitbot.cpp",
+        "bytes": 3095,
+        "sha256": "422a831a42d58170413bfaf30a899a98fa4ccc6a8ee9e04362f5127702ff2f0f",
+        "kind": "project",
+        "lines": 108
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/rendering/impl/menu/menu.misc.cpp",
+        "bytes": 17445,
+        "sha256": "68b6eaeeed0fa44db27ead069331f22510de437b2573ae7a26d03bd8a9f8b40e",
+        "kind": "project",
+        "lines": 471
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/rendering/impl/menu/menu.player.cpp",
+        "bytes": 11382,
+        "sha256": "2c3144a538bfbf4d957f6b0fa7e141a20ce49dfd144b7475b71b733f7418e2ae",
+        "kind": "project",
+        "lines": 298
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/rendering/impl/menu/menu.ragebot.cpp",
+        "bytes": 4708,
+        "sha256": "2fff8a3d72f42ae9fe2081958c2da3defda7bc6cbd544464d2b6618ef23c0678",
+        "kind": "project",
+        "lines": 147
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/rendering/impl/menu/menu.skins.cpp",
+        "bytes": 46417,
+        "sha256": "81385c07b2c482f44dd136d5ed5f061edac345397a45128c64e13908eeb87dff",
+        "kind": "project",
+        "lines": 1456
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/rendering/impl/menu/menu.world.cpp",
+        "bytes": 11695,
+        "sha256": "231e459bf5651b92fefc2d57f4b87dd876b13dbbd9fd1df98c2edd25e3daf89d",
+        "kind": "project",
+        "lines": 322
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/rendering/impl/widgets.cpp",
+        "bytes": 25361,
+        "sha256": "b427b8deeac3cb6d55c797f1e519de3c3048d468072facb4a876b0ccfc1bf97b",
+        "kind": "project",
+        "lines": 533
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/rendering/rendering.hpp",
+        "bytes": 6075,
+        "sha256": "3bc1b381a77c5c7a9b3d862176c02a4956f2042a0ba229f87f66f0bc14e49d91",
+        "kind": "project",
+        "lines": 211
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/resources/fonts/inter.hpp",
+        "bytes": 4235646,
+        "sha256": "6a2368d33497de38b727cf71737d97c701af0dcf7ed34d23292e55df59f41cb4",
+        "kind": "project",
+        "lines": 57250
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/resources/fonts/pixel7.hpp",
+        "bytes": 332817,
+        "sha256": "4dc5ff441da1c87eadd1a6ebb47ff301c326be958b11365928fa402751417290",
+        "kind": "project",
+        "lines": 4509
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/resources/particles/effects.hpp",
+        "bytes": 122240,
+        "sha256": "c5d47ad805ea496520dc13c9c174c78aceab3cfc98aac112f424b1615acaa72b",
+        "kind": "project",
+        "lines": 1675
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/resources/particles/weather.hpp",
+        "bytes": 72776,
+        "sha256": "08291690dc956d02342ce83b056360631fcc9a58a8b06a8a8a05d245667fe488",
+        "kind": "project",
+        "lines": 999
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/settings.hpp",
+        "bytes": 55887,
+        "sha256": "8ed7f9e8fe568ac7331befdfa972800603ebec19e369aada4a1a37314e677e52",
+        "kind": "project",
+        "lines": 1483
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/systems/impl/bones.cpp",
+        "bytes": 2571,
+        "sha256": "fbb18e6233290b29d101d1d7011fa2eda783f566622da2d5601c13bae557569f",
+        "kind": "project",
+        "lines": 102
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/systems/impl/bounds.cpp",
+        "bytes": 2319,
+        "sha256": "d98d169e32a44949b9e9091004b12f42132e18469b2aadc44fc2bf0615891558",
+        "kind": "project",
+        "lines": 72
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/systems/impl/entities.cpp",
+        "bytes": 6647,
+        "sha256": "ff64428c33ecb1cdb64f3499a35661afe3448b63b3489727a7978c60acb4d9bd",
+        "kind": "project",
+        "lines": 294
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/systems/impl/events.cpp",
+        "bytes": 3153,
+        "sha256": "0b257f982b6c07481a1aa0d441ec505e75f4a451db239c0c7cb88c822a5872ed",
+        "kind": "project",
+        "lines": 121
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/systems/impl/frame_data.cpp",
+        "bytes": 815,
+        "sha256": "e3ed5a094a4a4b42175a977eb21dd59a041cba4fef3981305761a222af046a66",
+        "kind": "project",
+        "lines": 34
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/systems/impl/hitboxes.cpp",
+        "bytes": 5069,
+        "sha256": "2bf6ac42370545e66f0ab887a615029bd69ff1682b14fe41e86b3bfc3b48162d",
+        "kind": "project",
+        "lines": 163
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/systems/impl/icons.cpp",
+        "bytes": 8723,
+        "sha256": "01608f502da7bc7647396f9008e40f628c242b420324f4e855a41510f8c2ff40",
+        "kind": "project",
+        "lines": 335
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/systems/impl/input.cpp",
+        "bytes": 12077,
+        "sha256": "94b6d3f304c82cd0695ccc9eb07177f249bccea99d86dc938b614142ec6e1b78",
+        "kind": "project",
+        "lines": 423
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/systems/impl/legit_input.cpp",
+        "bytes": 5400,
+        "sha256": "602d7b3935c5de72bbab4b972688019250cf4b86c3eb63735cc42e414dbaff4b",
+        "kind": "project",
+        "lines": 191
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/systems/impl/local.cpp",
+        "bytes": 4458,
+        "sha256": "d6f79521c6c43dfdd78acf0ec3a93cc0a46ada5d272259bee2deac29e0e944e6",
+        "kind": "project",
+        "lines": 154
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/systems/impl/materials.cpp",
+        "bytes": 30466,
+        "sha256": "7317874167999bd1eabd79b05128e8fa2c50a7b2b33cedf3c127921d9bc6bf0c",
+        "kind": "project",
+        "lines": 844
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/systems/impl/model_preview.cpp",
+        "bytes": 2646,
+        "sha256": "9e8a32c5c7f6f3744c914a3c5657907ff1b38846dfb6b4aa208284bc2363f3d7",
+        "kind": "project",
+        "lines": 75
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/systems/impl/prediction.cpp",
+        "bytes": 21830,
+        "sha256": "f256009a5392e1ef5985f18c81200c8463ff78294273d0e15e4f8f994bd973ca",
+        "kind": "project",
+        "lines": 391
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/systems/impl/schemas.cpp",
+        "bytes": 1232,
+        "sha256": "1e2ab699985ff3ece5691391f382f6578f969a6f2000d291dd6e717ec86afb5f",
+        "kind": "project",
+        "lines": 52
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/systems/impl/tracing.cpp",
+        "bytes": 5577,
+        "sha256": "ce1141275722c5683934f1c785b6971246045884e68d3851baeeb33e8a1dbeb5",
+        "kind": "project",
+        "lines": 162
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/systems/impl/view.cpp",
+        "bytes": 3241,
+        "sha256": "0b67b94875db7d7273411ea8471a7197348e87a2383eb0e4b4fe5b0d60242b40",
+        "kind": "project",
+        "lines": 129
+      },
+      {
+        "path": "cs2/velocity-cs2/project/core/systems/systems.hpp",
+        "bytes": 20092,
+        "sha256": "f6a9ea9226b60c9a66adc14dd6f3da3707d4b759309e834b9326cce851458394",
+        "kind": "project",
+        "lines": 670
+      },
+      {
+        "path": "cs2/velocity-cs2/project/entry.cpp",
+        "bytes": 14158,
+        "sha256": "e06579e83a585414fcb505cb99fd2bef8539ae578878e754e0ab9e0202fa60b3",
+        "kind": "project",
+        "lines": 570
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/bc7.hpp",
+        "bytes": 12126,
+        "sha256": "c37514382b59866853eae8470d3445fc9ac3fc2e42326ddd0f8191d3b49eb647",
+        "kind": "dependency",
+        "lines": 361
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/config.hpp",
+        "bytes": 29616,
+        "sha256": "04c6cef25ae7def2d210a1e10ae4a1cfd20f02f54a7b37dde0893448e38990e7",
+        "kind": "dependency",
+        "lines": 1167
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/inline-syscall/inline_syscall.hpp",
+        "bytes": 2115,
+        "sha256": "d87faa9aca8754dd6133cec0f926acf70b615a698493d41e846bdb454ea86567",
+        "kind": "dependency",
+        "lines": 59
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/inline-syscall/inline_syscall.inl",
+        "bytes": 21850,
+        "sha256": "5b33f07595b56c0ca9add217863cad91bf4a4abe3ef178faac2aa840005b9f7e",
+        "kind": "dependency",
+        "lines": 560
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/lz4/lz4.c",
+        "bytes": 118407,
+        "sha256": "aba04f8c20e7f7396bed55e0ee041f762d9ee123e175d1b48cf8a9533a360074",
+        "kind": "dependency",
+        "lines": 2833
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/lz4/lz4.h",
+        "bytes": 46123,
+        "sha256": "774f26afe507c3ea4e781faca51dfcad719f60804526cef7fe223e3c3e534eef",
+        "kind": "dependency",
+        "lines": 887
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/nlohmann/json.hpp",
+        "bytes": 837757,
+        "sha256": "75fad3185fcc83fdbffca49448ef8803ad8ceddab5a94e49dc188655c8ea5e31",
+        "kind": "dependency",
+        "lines": 25575
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/ntafd.h",
+        "bytes": 45535,
+        "sha256": "b9488fc22e8f207c21748826e32abe822b5c2152b534f6c7ff6ed47868b6b377",
+        "kind": "dependency",
+        "lines": 1170
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/ntbcd.h",
+        "bytes": 133287,
+        "sha256": "30dc961647f9290e9cd2d8a612092dd7d3303101552defaeb9b0dc7b90b09214",
+        "kind": "dependency",
+        "lines": 2765
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/ntd3dkmt.h",
+        "bytes": 4147,
+        "sha256": "c28aad3accd5f8f28f7507e2e745fdff52b4e9f591e0854beea461219c33b1e0",
+        "kind": "dependency",
+        "lines": 108
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/ntdbg.h",
+        "bytes": 15648,
+        "sha256": "46cdf7155681c44d0b334d7834cb76b3092aff063394ded3d254b9110d320843",
+        "kind": "dependency",
+        "lines": 639
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/ntexapi.h",
+        "bytes": 386368,
+        "sha256": "0510ac40fa1690cd73bed8afe3ed602aaa7bb6870ab95ea9aaba36ce1f4c3d53",
+        "kind": "dependency",
+        "lines": 9919
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/ntgdi.h",
+        "bytes": 4158,
+        "sha256": "4cd3f78deb8aee503256dd77fd1ad4ca7d8f1a0339367100bd41b9a5f66ef4ac",
+        "kind": "dependency",
+        "lines": 132
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/ntimage.h",
+        "bytes": 12004,
+        "sha256": "d36a5bd8c71fee0eaf85f234bd6a884107cbec69603f4400e33209d173875b32",
+        "kind": "dependency",
+        "lines": 315
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/ntintsafe.h",
+        "bytes": 158847,
+        "sha256": "cb223ddd7ef22ed5e77d8f070a871066ba72991bd511592d7f2a117f7d8985cf",
+        "kind": "dependency",
+        "lines": 8617
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/ntioapi.h",
+        "bytes": 169450,
+        "sha256": "6339b1de2654a285dca50ba386a4681953cc58448f888ca1c5f4bf3510bd108b",
+        "kind": "dependency",
+        "lines": 4146
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/ntkeapi.h",
+        "bytes": 5823,
+        "sha256": "a9ac8447dd1021ec3ae80893466d4014e8377d4caa63c1a5749adf6e287d6556",
+        "kind": "dependency",
+        "lines": 169
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/ntldr.h",
+        "bytes": 67749,
+        "sha256": "fe5cd73b220a5ecd21e0a3e7f4ca65504b496e0f87ce9d482ea8fb0158a6ac8e",
+        "kind": "dependency",
+        "lines": 1972
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/ntlpcapi.h",
+        "bytes": 26917,
+        "sha256": "9f3616b9006f2867b7dc41a6718b4d524a8395a1a7902ab40824cbae0c383f08",
+        "kind": "dependency",
+        "lines": 1094
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/ntmisc.h",
+        "bytes": 37853,
+        "sha256": "3533c12ca4b46daa019972a44873fc024347787aca3d1d66e0452dc4ac8d7f78",
+        "kind": "dependency",
+        "lines": 1218
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/ntmmapi.h",
+        "bytes": 92011,
+        "sha256": "8acd89a95f890f929da824cc841383770a4f21f312bb04d0d12f03cb3a00e079",
+        "kind": "dependency",
+        "lines": 2006
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/ntnls.h",
+        "bytes": 2184,
+        "sha256": "6d5fd2a22ed8b54cba1c19f190d76538e07766b99d3283c5e3063c05fe1d31ec",
+        "kind": "dependency",
+        "lines": 57
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/ntobapi.h",
+        "bytes": 24578,
+        "sha256": "a449733d5c32e5231c8b6ddef4419f2909869a7fd55958cec9a5a8e60e0d2416",
+        "kind": "dependency",
+        "lines": 691
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/ntpebteb.h",
+        "bytes": 42029,
+        "sha256": "9869d45323706a6bf7cb3ed168b4ca6560aef194f1c6a4d37aaad74a356ad248",
+        "kind": "dependency",
+        "lines": 1598
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/ntpfapi.h",
+        "bytes": 19498,
+        "sha256": "738024adad2079962dd7df00efd33bd07247933e71eb47c689e4d4818823db42",
+        "kind": "dependency",
+        "lines": 697
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/ntpnpapi.h",
+        "bytes": 5912,
+        "sha256": "887c55fbf4239417c792232075be855b4084856f6620242ea812b9c7ce2e2b98",
+        "kind": "dependency",
+        "lines": 204
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/ntpoapi.h",
+        "bytes": 82539,
+        "sha256": "48294fac3b222b51f9c7a609adbafb4751cdaa87d51fa6d227e066e29e94daf9",
+        "kind": "dependency",
+        "lines": 1966
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/ntpsapi.h",
+        "bytes": 180987,
+        "sha256": "3477b3fa901715c5ad139ae154f86d6c36f3415962731d6c0de0dd3c8417f4d8",
+        "kind": "dependency",
+        "lines": 4378
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/ntregapi.h",
+        "bytes": 54217,
+        "sha256": "1ee828f4eb5d97f00a6442c51896365689b4763790c26c417bf9008d37e58191",
+        "kind": "dependency",
+        "lines": 1536
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/ntrtl.h",
+        "bytes": 340232,
+        "sha256": "8d37faeb36dd01d0f9931cc25ce35857848deacb28b21196b8a76732e2f3f3a3",
+        "kind": "dependency",
+        "lines": 13282
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/ntsam.h",
+        "bytes": 61769,
+        "sha256": "43b0246ed6e5c3fcb65fa67cb5e81811e5404a2e4ad10102939247247b0bd9f4",
+        "kind": "dependency",
+        "lines": 2123
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/ntseapi.h",
+        "bytes": 74208,
+        "sha256": "7fa0a21902ed64036c495216fba85d0e29a1d3028fd60d09103993817d1473df",
+        "kind": "dependency",
+        "lines": 1455
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/ntsmss.h",
+        "bytes": 4609,
+        "sha256": "d22b04d51772fe3c6a0a57b6becb50de5e10f7eaa32ee9853dc14f1a05aba576",
+        "kind": "dependency",
+        "lines": 211
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/ntstrsafe.h",
+        "bytes": 411809,
+        "sha256": "3ca83d500eb58b6c6357db0ab1fa36a526490466a43e049f25b891a7b5ad0411",
+        "kind": "dependency",
+        "lines": 13074
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/ntsxs.h",
+        "bytes": 22878,
+        "sha256": "217233f36f3c455797509bfaf3025d883691b1df92a4d6c21b707f82d2f17dcb",
+        "kind": "dependency",
+        "lines": 522
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/nttmapi.h",
+        "bytes": 8798,
+        "sha256": "bc57105d205c21244730268cbdde91391c46c0963def3b92b79dbc38aed08a28",
+        "kind": "dependency",
+        "lines": 398
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/nttp.h",
+        "bytes": 28007,
+        "sha256": "92fe44bd7d79329801aba1700eafdc7de0514af0fd875938e548c914df0004c3",
+        "kind": "dependency",
+        "lines": 862
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/nttypesafe.h",
+        "bytes": 10214,
+        "sha256": "c21fec0b02d4b9513393da13b86cb073abb83ccbae8a5a0f3d0e3091733ed570",
+        "kind": "dependency",
+        "lines": 567
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/ntuser.h",
+        "bytes": 74370,
+        "sha256": "b6d678fa535b08c2102f1b9f51111c05c625a04be1b813dae5357f56208ccb1e",
+        "kind": "dependency",
+        "lines": 3254
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/ntwmi.h",
+        "bytes": 237808,
+        "sha256": "ea487f6366b9678ab31a2f8509b4fbc0be63d4deb83a86b123da83c66b21cf21",
+        "kind": "dependency",
+        "lines": 6667
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/ntwow64.h",
+        "bytes": 26641,
+        "sha256": "d672ef8852799d26a5f45969033cdb3c711cef373bf523944d3af1c8be288a89",
+        "kind": "dependency",
+        "lines": 838
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/ntxcapi.h",
+        "bytes": 2556,
+        "sha256": "515ea365ad333fd3739f11228133dd4c6f26a958caffc36dcaacae512df19bd3",
+        "kind": "dependency",
+        "lines": 131
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/ntzwapi.h",
+        "bytes": 108462,
+        "sha256": "a6495fa4d690ee5a4a7f664b730c28c7f18f84ea8aefbe27042c8e60de9f2d6c",
+        "kind": "dependency",
+        "lines": 5011
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/phnt.h",
+        "bytes": 4447,
+        "sha256": "e9f283f6dba8952df634e227bd9572370c7a3f307e29e3272dacc319aca13598",
+        "kind": "dependency",
+        "lines": 137
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/phnt_ntdef.h",
+        "bytes": 34886,
+        "sha256": "2ecede482c771d4e26b9d856c7743858cd2d01ccd69bb2795e95474f2c2e75db",
+        "kind": "dependency",
+        "lines": 1224
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/phnt_windows.h",
+        "bytes": 4826,
+        "sha256": "997a9fa1d4b6413818ca33c40fe89a42d2a7c97e2875ea786e9c61c33ff49446",
+        "kind": "dependency",
+        "lines": 183
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/smbios.h",
+        "bytes": 118949,
+        "sha256": "51af47b20a3d1e4a01b9bbbbcf33df82b58fce0f780199427665cafc35b2f0c8",
+        "kind": "dependency",
+        "lines": 2807
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/subprocesstag.h",
+        "bytes": 2838,
+        "sha256": "9fe034f1df7d4481e8c8bfb627efe8d9d80ad7d287147a45d9f83728dec37515",
+        "kind": "dependency",
+        "lines": 104
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/usermgr.h",
+        "bytes": 3313,
+        "sha256": "c70b9fc5bcb47148f62a29fea0b0a940e0100b50fd62cd9fce53667b87ee33ed",
+        "kind": "dependency",
+        "lines": 232
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/phnt/winsta.h",
+        "bytes": 49087,
+        "sha256": "35a0fcba4acdd903b661d18bf3ee374033041ed3beb309f640ee1aa8164af1b4",
+        "kind": "dependency",
+        "lines": 1554
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/poly2d.hpp",
+        "bytes": 16576,
+        "sha256": "fa3eb3e3000f452d735c85c67fe16f89fe624f82948e35f89d4daf1e0b680d24",
+        "kind": "dependency",
+        "lines": 743
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/stackwalker/stackwalker.cpp",
+        "bytes": 59870,
+        "sha256": "7bac5757edd746631d1fb1474681c4c1bc439f32519038fc37304ecc89b4b71a",
+        "kind": "dependency",
+        "lines": 1550
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/stackwalker/stackwalker.hpp",
+        "bytes": 10436,
+        "sha256": "68609fa6940aac830d8897863fea976050ca95dc9f433b9f412bfaf412130c56",
+        "kind": "dependency",
+        "lines": 273
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/xdraw/dependencies/fonts.hpp",
+        "bytes": 8312496,
+        "sha256": "7a20e4dbd70f9bee16d13572e6cc84543ecf9be7a947bbb5dcdd1c1d29fbdae7",
+        "kind": "dependency",
+        "lines": 112343
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/xdraw/dependencies/freetype/include.hpp",
+        "bytes": 59,
+        "sha256": "05d6ba0f85b3cda96596e98fdc0320db56e35d25cdd86802c0dd0b7f5bce0595",
+        "kind": "dependency",
+        "lines": 5
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/xdraw/dependencies/nanosvg/include.hpp",
+        "bytes": 131,
+        "sha256": "a9acc7d7512881a9293d7231de11135f2e70b2aba47e05e9b8ef334bd3cd13b3",
+        "kind": "dependency",
+        "lines": 8
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/xdraw/dependencies/nanosvg/x/nanosvg.h",
+        "bytes": 90079,
+        "sha256": "4462f1db7df2aa317f8e73219d585c5673a7a8ad9e5f60c99c226b490eb5d61b",
+        "kind": "dependency",
+        "lines": 3224
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/xdraw/dependencies/nanosvg/x/nanosvgrast.h",
+        "bytes": 40872,
+        "sha256": "994afccc3eb50cd21ca42b8b4052a5150e886a818af35bb793d09398ef400f0a",
+        "kind": "dependency",
+        "lines": 1494
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/xdraw/dependencies/shaders.hpp",
+        "bytes": 30778,
+        "sha256": "6f6cad640d9d6656f29b312d2389a6fd716f036ebd6678e8dd6ba7fdc07cff80",
+        "kind": "dependency",
+        "lines": 979
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/xdraw/xdraw.cpp",
+        "bytes": 92987,
+        "sha256": "76b4ea67ba45cf32f7b9324b3b194b6c34d0b93a783385acaa9f5ce30ef18302",
+        "kind": "dependency",
+        "lines": 3374
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/xdraw/xdraw.hpp",
+        "bytes": 8864,
+        "sha256": "e276573da77732e0c30ff649fa37f355210f984e5f61bf1482eabe57e5dc9807",
+        "kind": "dependency",
+        "lines": 246
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/xdraw/xui/xui.cpp",
+        "bytes": 144136,
+        "sha256": "6c3b3ac195603046b05889b2d9ae9bbb95529079389455c1c173a3b999a1921f",
+        "kind": "dependency",
+        "lines": 5063
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/xdraw/xui/xui.hpp",
+        "bytes": 16472,
+        "sha256": "426555d76f40b6f5b298d85274698938ef624e39e183c71aee789d3211960b58",
+        "kind": "dependency",
+        "lines": 582
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/xorstr.hpp",
+        "bytes": 10941,
+        "sha256": "cb709dd7a32ac296ee5204416cb094ef49ad81477a2efba77366f60acd0a260f",
+        "kind": "dependency",
+        "lines": 242
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/zydis/zydis.c",
+        "bytes": 11762811,
+        "sha256": "9d27ff47cbe8f9d614a9730a6e746b2399927436d1705d7d383fc63402f91e53",
+        "kind": "dependency",
+        "lines": 54197
+      },
+      {
+        "path": "cs2/velocity-cs2/project/external/zydis/zydis.h",
+        "bytes": 400974,
+        "sha256": "a0b01729ce666949ed267c5d08012e2007a022cf43eb876542df66271e6869ed",
+        "kind": "dependency",
+        "lines": 11886
+      },
+      {
+        "path": "cs2/velocity-cs2/project/pch/pch.cpp",
+        "bytes": 22,
+        "sha256": "aecffbfedda25244f1901985094afdd8a2103b50a778df797ee02962959f581c",
+        "kind": "project",
+        "lines": 1
+      },
+      {
+        "path": "cs2/velocity-cs2/project/pch/pch.hpp",
+        "bytes": 1493,
+        "sha256": "3250b5e88ff909593368cfd3ff398e84befdaac2cd7f2661ca1cbfe8e14bbdf8",
+        "kind": "project",
+        "lines": 79
+      },
+      {
+        "path": "cs2/velocity-cs2/project/protection/game_addresses.hpp",
+        "bytes": 3466,
+        "sha256": "e852ef9dff99cb6e9a95ba860f4c1b1f5419b609d67d7aada9fa1d4252875557",
+        "kind": "project",
+        "lines": 143
+      },
+      {
+        "path": "cs2/velocity-cs2/project/protection/patterns.cpp",
+        "bytes": 39250,
+        "sha256": "d60d0609f3cbc874319f64dc9677620940d7cb1226fdee27c24ebc48ad2506b3",
+        "kind": "project",
+        "lines": 727
+      },
+      {
+        "path": "cs2/velocity-cs2/project/protection/patterns.hpp",
+        "bytes": 10234,
+        "sha256": "d37ae0b61e7de8a72bea08634795f5b6c3498f3df2e13080df400ecdfa3eb407",
+        "kind": "project",
+        "lines": 156
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/addresses/addresses.hpp",
+        "bytes": 2813,
+        "sha256": "e993af82b56602049ca6108ccc02ed3c3bc1f1fbb1734da4a24d12a239362180",
+        "kind": "project",
+        "lines": 92
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/addresses/impl/functions.cpp",
+        "bytes": 2816,
+        "sha256": "6528cc4b69a93a9b9ab8386c0b660f751cced57669ab8d702cae4d0910443841",
+        "kind": "project",
+        "lines": 117
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/addresses/impl/globals.cpp",
+        "bytes": 4290,
+        "sha256": "2a73c8a015ab088e754c1f1965af4f14ec649ce351bb17f9683748f477fc9483",
+        "kind": "project",
+        "lines": 93
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/addresses/impl/interfaces/engine_cvar.cpp",
+        "bytes": 3053,
+        "sha256": "113ec2ec7213b3eb8b3855ece78c2ec2b10e2ee745a8bb8f77093f464ffee6eb",
+        "kind": "project",
+        "lines": 118
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/addresses/impl/modules.cpp",
+        "bytes": 3018,
+        "sha256": "68ee329462b2e4c03a57b8698a2576f764c51e2d55502dae2b6631c5702c248c",
+        "kind": "project",
+        "lines": 54
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/addresses/interfaces.hpp",
+        "bytes": 1774,
+        "sha256": "986571e247c67227d83a3a9e2c827945324ec6a20dc50c2923c0a7b1bb5a3987",
+        "kind": "project",
+        "lines": 78
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/animation.hpp",
+        "bytes": 5447,
+        "sha256": "1c4e804cf8d44fa9fd931f6ff0d0cae6e235d6dd21b685d46ccb25bb65b0cb5d",
+        "kind": "project",
+        "lines": 255
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/cstypes.hpp",
+        "bytes": 11164,
+        "sha256": "5a5269b663e94075d4e563bde80292dd621633e590471ca144e8e1538b9ca314",
+        "kind": "project",
+        "lines": 380
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/diag.hpp",
+        "bytes": 17638,
+        "sha256": "867c54460420940abb819bc6cdfd113f1b6f3da25126ccb0359d871f1db6228f",
+        "kind": "project",
+        "lines": 771
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/fnv1a.hpp",
+        "bytes": 704,
+        "sha256": "638cb922d5cc85f5894db3caeccbe2286b0be5e0f19f5aa5c7cb050f84f286a6",
+        "kind": "project",
+        "lines": 42
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/game_path.hpp",
+        "bytes": 1775,
+        "sha256": "287e1fcaaea5048e7d1c23afa1c5a278d97ea2b0ae7cb01ca16e6a6d7046c7a4",
+        "kind": "project",
+        "lines": 78
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/hooking/hooking.hpp",
+        "bytes": 1668,
+        "sha256": "00a7375cbcd16197a5e2f5837e2a91b322f01f08ae9a7fdb1a344604dcda2ac0",
+        "kind": "project",
+        "lines": 74
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/hooking/impl/allocator.cpp",
+        "bytes": 2021,
+        "sha256": "240e23da9432263e980bb6eac4e9ba8f9d76e155f278dccf588428fdec9ecd48",
+        "kind": "project",
+        "lines": 57
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/hooking/impl/jmp.cpp",
+        "bytes": 9253,
+        "sha256": "407401ca138f1c3a0f4fbcda0c360d2f2ad5069a318689a525951c69fe04d817",
+        "kind": "project",
+        "lines": 334
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/hooking/impl/manager.cpp",
+        "bytes": 1281,
+        "sha256": "d010e2b87162e0c612c027f8d275182a2c16ccba7d3069fc295d862782ec4891",
+        "kind": "project",
+        "lines": 60
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/logging/impl/console.cpp",
+        "bytes": 668,
+        "sha256": "997a05e120fdb5402f406be9d5394181dd14212c67d2d25483304097f9cdb540",
+        "kind": "project",
+        "lines": 27
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/logging/impl/popup.cpp",
+        "bytes": 643,
+        "sha256": "8326d825ffb91a1427da13790e1d2991d58409f2fb4f9b7005b4711bd6e989e4",
+        "kind": "project",
+        "lines": 27
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/logging/logging.hpp",
+        "bytes": 504,
+        "sha256": "86e9347f7dc064eabaaa6cc9cb951a2455949a52804ad271e45c5e416420f474",
+        "kind": "project",
+        "lines": 29
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/math/math.cpp",
+        "bytes": 10105,
+        "sha256": "980fa61c7d7ea1d9da95b39e795bdccb38ac559f1d2a66293f7bcb42ad5fc7a5",
+        "kind": "project",
+        "lines": 353
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/math/math.hpp",
+        "bytes": 4136,
+        "sha256": "c0ac76039cb42ce31255daad7a5a5214bbef75652a8bc8d538fdfd0145b3aea2",
+        "kind": "project",
+        "lines": 124
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/memory/memory.cpp",
+        "bytes": 17258,
+        "sha256": "83feaf832b83a7d410e5e012e91e8fc3a4d1224b5bc30036adf765b087cc5114",
+        "kind": "project",
+        "lines": 604
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/memory/memory.hpp",
+        "bytes": 3384,
+        "sha256": "3440423b34ca32045e1bb9fcf58d3368b09352ee3309495729e09e63d71732d3",
+        "kind": "project",
+        "lines": 124
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/overrides.cpp",
+        "bytes": 1211,
+        "sha256": "302707c70f4660af5dc4a5be4c9dc698e25b44c42561df0330e291fbd20046b1",
+        "kind": "project",
+        "lines": 40
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/proto/proto.cpp",
+        "bytes": 16541,
+        "sha256": "58fac36cf74ba57f55f3c689f816567028ea20cd08059752c0bf4cf8d5736548",
+        "kind": "project",
+        "lines": 200
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/proto/proto.hpp",
+        "bytes": 11471,
+        "sha256": "59a343975fb5a940707d2218e394e42d4485873abe5fd3ffb75176c262cb571a",
+        "kind": "project",
+        "lines": 359
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/random/random.cpp",
+        "bytes": 1700,
+        "sha256": "38a2f914f5301cc387607eb06a5863129a5da132a8e941e2ad5e06be6cc180fd",
+        "kind": "project",
+        "lines": 85
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/random/random.hpp",
+        "bytes": 593,
+        "sha256": "40b6971f2c2e46f143867d2e8af8b4e7b544d22dd58d2160fccf9ffb076593d0",
+        "kind": "project",
+        "lines": 24
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/security/impl/integrity.cpp",
+        "bytes": 723,
+        "sha256": "217d9725a7d534cc611fe2aa8ed768c020f668d75ae4ac4109646865237ab227",
+        "kind": "project",
+        "lines": 29
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/security/impl/prologues.cpp",
+        "bytes": 556,
+        "sha256": "a3860356ad7c14b857dc0dad4eb81b26c3c10043cf15c41aaba3ab10f854cb52",
+        "kind": "project",
+        "lines": 30
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/security/impl/regions.cpp",
+        "bytes": 973,
+        "sha256": "d2c8aacefed18ab4261205cc15eb728c840492668ddc204d00a38eb552106752",
+        "kind": "project",
+        "lines": 44
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/security/security.hpp",
+        "bytes": 984,
+        "sha256": "d98d578e87e351825ecbf3fd946169b0b1666f0fcd4e5a2f666093a6be9d4446",
+        "kind": "project",
+        "lines": 53
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/steam/impl/friends.cpp",
+        "bytes": 674,
+        "sha256": "a0f10eb165e2e06c02b4faf6f1ed2b40f6374520b2d399e0dfe70eb03be80e62",
+        "kind": "project",
+        "lines": 23
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/steam/impl/http.cpp",
+        "bytes": 4121,
+        "sha256": "f22cd4ee95c25ac590cb0f0febe9034e0c616a72ba2d364d513e66b0e813826a",
+        "kind": "project",
+        "lines": 121
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/steam/impl/user.cpp",
+        "bytes": 621,
+        "sha256": "4dc9283b2f1a685ecd20656b9c0b0e15e7ee164f0ed6abece0f6c817cef234f9",
+        "kind": "project",
+        "lines": 26
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/steam/impl/utils.cpp",
+        "bytes": 998,
+        "sha256": "65cc4f8f7429dffb64acaca3788a2ab25bbbdc012b7d590169da6a6bf46177ff",
+        "kind": "project",
+        "lines": 35
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/steam/steam.hpp",
+        "bytes": 1228,
+        "sha256": "b1e011090a3e7e650a4b915d1fcfdb08ee6e21a0d010c927c2f649332fdd5608",
+        "kind": "project",
+        "lines": 47
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/threadpool/threadpool.cpp",
+        "bytes": 7143,
+        "sha256": "3b0d1d1cf41f7d932226d9a383b11b779d4460ce0ac1bf9177ecda1194ecd08e",
+        "kind": "project",
+        "lines": 283
+      },
+      {
+        "path": "cs2/velocity-cs2/project/utilities/threadpool/threadpool.hpp",
+        "bytes": 1879,
+        "sha256": "3374d20a0789f054c7d9a05c30e9cc8bbcc3cd7f161fdb774e7934b01c78fd4d",
+        "kind": "project",
+        "lines": 72
+      },
+      {
+        "path": "cs2/velocity-cs2/vcpkg.json",
+        "bytes": 219,
+        "sha256": "e2c402c2346e1ae82d7609012cdcec3ea138a944dcd9ed0c789d54cb727766c0",
+        "kind": "project",
+        "lines": 12
+      },
+      {
+        "path": "cs2/velocity-cs2/velocity-cs2.vcxproj",
+        "bytes": 21736,
+        "sha256": "16831279b9dd65ef6e64553b4d95d02a299ab7b2780cac4b7634ace49833741c",
+        "kind": "project",
+        "lines": 356
+      },
+      {
+        "path": "cs2/velocity-cs2.slnx",
+        "bytes": 254,
+        "sha256": "1f99d5cc5c7d1ec09c5409beb62b0c83e55804500c20d7f1ae15d290ebd3b9d4",
+        "kind": "project",
+        "lines": 9
+      },
+      {
+        "path": "README.md",
+        "bytes": 346,
+        "sha256": "615c83a5c52d354ce5e79924c1cf75ef63d4c236d57ca0d90983270e0e63f3a0",
+        "kind": "project",
+        "lines": 13
+      }
+    ],
+    "total": 201,
+    "project_files": 135
+  }
+}

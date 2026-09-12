@@ -165,11 +165,14 @@ inline bool ReadBomb(const Memory &m, std::uintptr_t list, std::uintptr_t entity
 }
 inline void FireBoundary(combat::Area &area, std::span<const Vector3> positions,
                          std::span<const std::uint8_t> burning) noexcept {
+    area.cellCount = 0;
     std::array<Vector3, 512> points{};
     std::size_t count{};
     for (std::size_t k = 0; k < positions.size() && k < burning.size() && k < 64; ++k) {
         if (burning[k] == 0 || !PlausiblePosition(positions[k]))
             continue;
+        area.cells[area.cellCount] = positions[k];
+        area.cellNormals[area.cellCount++] = {0, 0, 1};
         for (int i = 0; i < 8; ++i) {
             const float angle = i * .7853981634f;
             points[count++] = positions[k] + Vector3{std::cos(angle) * 25, std::sin(angle) * 25, 2};
@@ -199,6 +202,26 @@ inline void FireBoundary(combat::Area &area, std::span<const Vector3> positions,
     for (std::size_t i = 0; i < area.boundaryCount; ++i)
         area.boundary[i] = hull[i * n / area.boundaryCount];
 }
+// Current supported CS2 timing uses 64 ticks per second, as does the supplied source.
+// The active entity controls the footprint; estimated smoke timing never hides it.
+inline combat::AreaTimer ReadAreaTimer(const Memory &m, std::uintptr_t entity, combat::AreaType type,
+                                       float gameTime) noexcept {
+    combat::AreaTimer timer;
+    if (!std::isfinite(gameTime) || gameTime <= 0 || type == combat::AreaType::Blast)
+        return timer;
+    int startTick{};
+    float duration = 18.f; // Standard smoke lifetime; shown with an estimate marker.
+    const bool fire = type == combat::AreaType::Fire;
+    if (!m.Field(entity, fire ? offsets::FireStartTick : offsets::SmokeStartTick, startTick) || startTick <= 0 ||
+        (fire && !m.Field(entity, offsets::FireLifetime, duration)) || !std::isfinite(duration) || duration <= 0 ||
+        duration > 60)
+        return timer;
+    const double age = double(gameTime) - double(startTick) / 64.;
+    if (age < 0 || age >= duration)
+        return timer; // Missing, future, reset or expired clocks do not fabricate a countdown.
+    timer = {static_cast<float>(duration - age), duration, !fire};
+    return timer;
+}
 class WorldReader {
     struct Entry {
         std::uint32_t handle{};
@@ -211,10 +234,10 @@ class WorldReader {
     double previous_{};
 
   public:
-    void Reset() noexcept { *this = {}; }
+    void Reset() noexcept { ResetInPlace(*this); }
     bool Update(const Memory &m, std::uintptr_t list, std::uintptr_t localPawn, float gameTime, double now,
                 combat::WorldSnapshot &out, const combat::InfernoEvents &events = {}) noexcept {
-        out = {};
+        out.Clear();
         out.gameTime = gameTime;
         if (!list || !std::isfinite(now)) {
             Reset();
@@ -293,6 +316,9 @@ class WorldReader {
                 std::array<Vector3, 64> positions{};
                 std::array<std::uint8_t, 64> burning{};
                 ++out.fireEntities;
+                std::uint8_t postEffect{};
+                if (m.Field(entity, offsets::FirePostEffect, postEffect) && postEffect == 1)
+                    continue;
                 if (!m.Field(entity, offsets::FireCount, count) || count < 1 || count > 64 ||
                     !m.read(m.context, entity + offsets::FirePositions, positions.data(), sizeof(Vector3) * count) ||
                     !m.read(m.context, entity + offsets::FireBurning, burning.data(), count)) {
@@ -318,7 +344,20 @@ class WorldReader {
                 a.type = combat::AreaType::Fire;
                 FireBoundary(a, {positions.data(), static_cast<std::size_t>(count)},
                              {burning.data(), static_cast<std::size_t>(count)});
+                std::array<Vector3, 64> normals{};
+                if (m.read(m.context, entity + offsets::FireBurnNormal, normals.data(), sizeof(Vector3) * count)) {
+                    unsigned cell{};
+                    for (int k = 0; k < count && cell < a.cellCount; ++k)
+                        if (burning[k] && PlausiblePosition(positions[k])) {
+                            const auto n = normals[k];
+                            const float length2 = n.x * n.x + n.y * n.y + n.z * n.z;
+                            if (Finite(n) && length2 > .5f && length2 < 1.5f)
+                                a.cellNormals[cell] = n;
+                            ++cell;
+                        }
+                }
             }
+            a.timer = ReadAreaTimer(m, entity, a.type, gameTime);
             if (FullHandle(m, entity, after) && after == e.handle && out.areaCount < out.areas.size())
                 out.areas[out.areaCount++] = a;
         }

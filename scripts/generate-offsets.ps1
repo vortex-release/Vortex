@@ -65,7 +65,10 @@ $fields = [ordered]@{
  SmokeCenter = $schema.C_SmokeGrenadeProjectile.fields.m_vSmokeDetonationPos
  FirePositions = $schema.C_Inferno.fields.m_firePositions
  FireBurning = $schema.C_Inferno.fields.m_bFireIsBurning
+ FireBurnNormal = $schema.C_Inferno.fields.m_BurnNormal
+ FirePostEffect = $schema.C_Inferno.fields.m_bInPostEffectTime
  FireCount = $schema.C_Inferno.fields.m_fireCount
+ FireLifetime = $schema.C_Inferno.fields.m_nFireLifetime
  FireStartTick = $schema.C_Inferno.fields.m_nFireEffectTickBegin
  GlobalVars = $globals.'client.dll'.dwGlobalVars
  EntityList = $globals.'client.dll'.dwEntityList
@@ -82,6 +85,7 @@ $fields = [ordered]@{
  MovementServices = $schema.C_BasePlayerPawn.fields.m_pMovementServices
  MovementMaxSpeed = $schema.CPlayer_MovementServices.fields.m_flMaxspeed
  MovementFriction = $schema.CPlayer_MovementServices_Humanoid.fields.m_flSurfaceFriction
+ MovementStepSide = $schema.CPlayer_MovementServices_Humanoid.fields.m_nStepside
  IsScoped = $schema.C_CSPlayerPawn.fields.m_bIsScoped
  WaitForNoAttack = $schema.C_CSPlayerPawn.fields.m_bWaitForNoAttack
  SpawnImmunity = $schema.C_CSPlayerPawn.fields.m_bGunGameImmunity
@@ -153,7 +157,7 @@ if ($contents.ContainsKey('offsets.hpp')) {
 if ($contents.ContainsKey('client_dll.hpp')) {
     $classes=@{
         CEffectData=@('m_vOrigin','m_vStart','m_hEntity')
-        C_Inferno=@('m_firePositions','m_bFireIsBurning','m_fireCount','m_nFireEffectTickBegin')
+        C_Inferno=@('m_firePositions','m_bFireIsBurning','m_fireCount','m_nFireLifetime','m_nFireEffectTickBegin')
         C_PlantedC4=@('m_bBombTicking','m_nBombSite','m_flC4Blow','m_bHasExploded','m_flTimerLength','m_bBeingDefused','m_flDefuseLength','m_flDefuseCountDown','m_bBombDefused','m_hBombDefuser')
         CCSPlayer_ItemServices=@('m_bHasDefuser')
         C_CSWeaponBase=@('m_flRecoilIndex','m_fLastShotTime')

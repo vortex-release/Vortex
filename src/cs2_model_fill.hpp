@@ -11,5 +11,12 @@ HRESULT StartModelFill() noexcept;
 void PauseModelFill() noexcept;
 bool UpdateModelFill(const FrameSnapshot &, const Configuration &, const EffectsConfiguration &, bool verified,
                      EffectsState &, bool shaded = true, const model::Targets *cached = nullptr) noexcept;
+struct ModelFillDiagnostics {
+    unsigned selectedObjects{}, callbacks{}, selectedCallbacks{}, rejectedOwnership{}, rejectedModels{},
+        generatedPackets{};
+    bool flatReady{}, litReady{}, hiddenBridgeReady{};
+    unsigned hiddenQueued{}, hiddenMatched{}, hiddenCaptured{}, hiddenDropped{};
+};
+ModelFillDiagnostics GetModelFillDiagnostics() noexcept;
 HRESULT StopModelFill() noexcept;
 } // namespace awareness::cs2

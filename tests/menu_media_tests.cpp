@@ -224,14 +224,19 @@ int main(int argc, char **argv) {
               "current-player depth fixture created");
         context->ClearRenderTargetView(target.Get(), clear);
         context->ClearDepthStencilView(liveDepthView.Get(), D3D11_CLEAR_DEPTH, 1, 0);
-        GhostSurface current{frame.viewProjection, frame.viewport, target.Get(), liveDepthView.Get(), true};
+        // Initialize replay resources before drawing the foreground fixture.
+        model.RenderGhosts(context.Get(), target.Get(), frame, frame.viewport, c, o, replayAt(10.35), 10.35,
+                           liveDepthView.Get());
+        context->ClearRenderTargetView(target.Get(), clear);
+        context->ClearDepthStencilView(liveDepthView.Get(), D3D11_CLEAR_DEPTH, 1, 0);
+        GhostSurface current{frame.viewProjection, frame.viewport, target.Get(), liveDepthView.Get(), false};
         EffectsConfiguration playerColor;
         playerColor.materialColor = {.7f, .2f, .8f, 1};
         check(SUCCEEDED(model.Render(context.Get(), &moved, 0, false, playerColor, &current)),
               "current player color fixture renders");
         const auto foreground = pixels();
-        check(SUCCEEDED(
-                  model.RenderGhosts(context.Get(), target.Get(), frame, frame.viewport, c, o, replayAt(10.3), 10.3)),
+        check(SUCCEEDED(model.RenderGhosts(context.Get(), target.Get(), frame, frame.viewport, c, o, replayAt(10.35),
+                                           10.35, liveDepthView.Get())),
               "moving historical poses render outside the current player");
         const auto ghost = pixels();
         std::size_t visible{}, overwritten{}, foregroundPixels{};
@@ -242,10 +247,16 @@ int main(int argc, char **argv) {
             } else
                 visible += ghost[i + 3] > 0;
         }
-        check(foregroundPixels > 10000 && overwritten > 100,
-              "nearby replay blends without a rectangular current-player cutout");
+        check(foregroundPixels > 10000 && overwritten == 0,
+              "current-player silhouette is never repainted by a nearby replay");
         check(visible > 100, "moving ghost remains visible outside the player silhouette");
         context->ClearRenderTargetView(target.Get(), clear);
+        check(model.RenderGhosts(context.Get(), target.Get(), frame, frame.viewport, c, o, replayAt(10.35), 10.35) ==
+                  S_FALSE,
+              "replay fails closed when scene depth is unavailable");
+        const auto missingDepth = pixels();
+        check(std::all_of(missingDepth.begin(), missingDepth.end(), [](auto x) { return x == 0; }),
+              "missing depth cannot paint replay through walls");
         context->ClearDepthStencilView(liveDepthView.Get(), D3D11_CLEAR_DEPTH, 0, 0);
         model.RenderGhosts(context.Get(), target.Get(), frame, frame.viewport, c, o, replayAt(10.3), 10.3,
                            liveDepthView.Get());

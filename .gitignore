@@ -43,3 +43,4 @@ dependencies/velopack/lib/*
 !dependencies/velopack/lib/velopack_libc_win_x64_msvc.dll.lib
 profile/background.png
 release/offline-verification-*.md
+release/review-*/

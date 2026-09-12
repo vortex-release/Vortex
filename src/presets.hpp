@@ -35,6 +35,7 @@ inline void Harmonize(Configuration &c, VisualOptions &v, EffectsConfiguration &
     if (e.visibility != EffectVisibility::TwoColor)
         e.glowColor = e.materialColor;
     v.haloColor = purple;
+    v.lineups.color = {purple.r, purple.g, purple.b, .9f};
     v.awarenessColor = white;
     auto &p = v.paths;
     p.trailHE = p.trailSmoke = p.trailFlash = p.trailFire = p.trailDecoy = purple;
@@ -58,6 +59,10 @@ inline void ApplyPreset(Preset preset, Configuration &c, VisualOptions &v, Track
                         EffectsConfiguration &e) noexcept {
     // Keep personal bindings, fonts, sound files and coordinate units.
     Harmonize(c, v, e);
+    const auto shootKey = v.assists.shootKey;
+    v.assists = {};
+    v.assists.shootKey = shootKey;
+    v.combat.recoilGroups = {0, 0, 1, 1, 0, 0};
     v.trackingProfiles = {};
     v.worldVisuals = {};
     c.enabled = 1;
@@ -86,17 +91,23 @@ inline void ApplyPreset(Preset preset, Configuration &c, VisualOptions &v, Track
     v.awarenessSize = 12;
     v.grenadePrediction = v.grenadeTrails = v.bulletTracers = 1;
     v.tracerTeams = 1;
+    v.cameraVisuals = {};
+    v.weather = {};
+    v.scoreboard = {};
+    // Personal loadout choices persist when applying visual presets.
+    v.scene = {};
+    v.lineups.enabled = 0;
     v.cameraFovEnabled = 0;
     v.cameraFov = 100;
     v.softGlow = 0;
     v.shadedFill = 1;
     v.glowStrength = .35f;
     v.statusHud = 0;
-    v.paths.trailWidth = 1.8f;
-    v.paths.previewWidth = 1.6f;
-    v.paths.shotWidth = 1.6f;
-    v.paths.shotLifetime = .75f;
-    v.paths.trailGlow = v.paths.shotGlow = 1;
+    v.paths.trailWidth = 1.35f;
+    v.paths.previewWidth = 1.35f;
+    v.paths.shotWidth = 1.15f;
+    v.paths.shotLifetime = .5f;
+    v.paths.trailGlow = v.paths.shotGlow = 0;
     v.paths.previewGlow = 0;
     v.paths.trailStrength = .55f;
     v.paths.shotStrength = .7f;
@@ -120,7 +131,7 @@ inline void ApplyPreset(Preset preset, Configuration &c, VisualOptions &v, Track
     o.markerDuration = .45f;
     o.markerHold = .25f;
     o.damageDuration = 1;
-    o.worldDarkness = .12f;
+    o.worldDarkness = 0;
     o.sceneContrast = o.sceneSaturation = 1;
     o.sceneExposure = o.sceneVignette = o.sceneTintStrength = 0;
     o.sceneTint = VortexWhite;
@@ -136,7 +147,7 @@ inline void ApplyPreset(Preset preset, Configuration &c, VisualOptions &v, Track
     v.activeTargetBone = 0;
     v.trackingTeams = 1;
     e.materialEnabled = e.glowEnabled = 1;
-    e.visibility = EffectVisibility::TwoColor;
+    e.visibility = EffectVisibility::AlwaysVisible;
     e.materialColor = VortexWhite;
     e.materialColor.a = .35f;
     e.glowColor = VortexViolet;
@@ -166,7 +177,7 @@ inline void ApplyPreset(Preset preset, Configuration &c, VisualOptions &v, Track
         c.distances = 1;
         o.damageNumbers = 1;
         o.hideParticles = 0;
-        e.visibility = EffectVisibility::TwoColor;
+        e.visibility = EffectVisibility::AlwaysVisible;
         e.materialColor = VortexWhite;
         e.materialColor.a = .45f;
         e.glowColor = VortexViolet;
@@ -179,7 +190,7 @@ inline void ApplyPlayerLook(int look, Configuration &c, VisualOptions &v, Effect
     v.playerStyle = {};
     c.colorBoxesByHealth = 0;
     e.materialEnabled = e.glowEnabled = 1;
-    e.visibility = EffectVisibility::TwoColor;
+    e.visibility = EffectVisibility::AlwaysVisible;
     v.shadedFill = 0;
     v.softGlow = 1;
     v.glowStrength = .55f;

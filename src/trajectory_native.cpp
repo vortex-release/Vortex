@@ -86,7 +86,7 @@ struct Native {
     std::array<Pending, 64> pending{};
     flight::Fov fov;
     std::atomic<ULONGLONG> deadline{};
-    double nextPrediction{};
+    camera_visuals::PredictionCadence predictionCadence;
 } state;
 struct Guard {
     Guard() { ++state.inFlight; }
@@ -132,6 +132,8 @@ bool Validate() noexcept {
 struct TraceContext {
     alignas(16) std::array<std::byte, 80> filter{};
     std::uintptr_t manager{}, padding{};
+    float radius{2.02f};
+    bool surfacePhysics{true};
 };
 // Keep SEH in leaf functions, with no C++ objects requiring unwinding.
 bool InitializeFilter(TraceContext &ctx, std::uintptr_t pawn) noexcept {
@@ -151,7 +153,9 @@ float SurfaceElasticity(std::uintptr_t entity) noexcept {
     Memory memory{&local, LocalMemory::Read};
     char name[64]{};
     float elasticity{};
-    if (EntityName(memory, entity, name) && (!std::strcmp(name, "cs_player_pawn") || !std::strcmp(name, "player")))
+    if (EntityName(memory, entity, name) &&
+        (!std::strcmp(name, "cs_player_pawn") || !std::strcmp(name, "c_cs_player_for_precache") ||
+         !std::strcmp(name, "player")))
         return .3f;
     return memory.Field(entity, offsets::Elasticity, elasticity) && std::isfinite(elasticity) && elasticity > 0 &&
                    elasticity <= 1
@@ -162,7 +166,7 @@ bool Sweep(void *context, Vector3 start, Vector3 end, flight::Collision &output)
     auto &ctx = *static_cast<TraceContext *>(context);
     alignas(16) std::byte ray[48]{};
     alignas(16) std::byte result[512]{};
-    const Vector3 bounds[2]{{-2.02f, -2.02f, -2.02f}, {2.02f, 2.02f, 2.02f}};
+    const Vector3 bounds[2]{{-ctx.radius, -ctx.radius, -ctx.radius}, {ctx.radius, ctx.radius, ctx.radius}};
     __try {
         using Hull = void (*)(void *, const Vector3 *);
         using Trace = bool (*)(void *, void *, const Vector3 &, const Vector3 &, void *, void *);
@@ -176,7 +180,7 @@ bool Sweep(void *context, Vector3 start, Vector3 end, flight::Collision &output)
         output.solid = result[abi::TraceStartSolid] != std::byte{};
         std::uintptr_t hitEntity{};
         std::memcpy(&hitEntity, result + 8, sizeof(hitEntity));
-        output.elasticity = SurfaceElasticity(hitEntity);
+        output.elasticity = ctx.surfacePhysics ? SurfaceElasticity(hitEntity) : 1;
         return Finite(output.end) && std::isfinite(output.fraction) && output.fraction >= 0 && output.fraction <= 1;
     } __except (EXCEPTION_EXECUTE_HANDLER) {
         return false;
@@ -188,6 +192,16 @@ bool SetFov(std::uintptr_t view, float expected, float desired) noexcept {
         if (*p != expected)
             return false;
         *p = desired;
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+}
+bool SetViewVector(std::uintptr_t address, Vector3 expected, Vector3 desired) noexcept {
+    __try {
+        if (std::memcmp(reinterpret_cast<void *>(address), &expected, sizeof(expected)))
+            return false;
+        std::memcpy(reinterpret_cast<void *>(address), &desired, sizeof(desired));
         return true;
     } __except (EXCEPTION_EXECUTE_HANDLER) {
         return false;
@@ -253,12 +267,13 @@ void SampleInputs(const VisualOptions &settings, bool applyRecoil) {
         state.previousRecoil = now;
         DWORD foregroundProcess{};
         GetWindowThreadProcessId(GetForegroundWindow(), &foregroundProcess);
-        const bool active = state.recoilActive && foregroundProcess == GetCurrentProcessId();
+        const bool active = state.recoilActive && foregroundProcess == GetCurrentProcessId() &&
+                            settings.combat.EnabledFor(recoil.weapon);
         auto correction = state.recoil.Update(recoil, settings.combat.Profile(recoil.weapon), dt, active);
         HRESULT result = S_FALSE;
-        if (!active || !recoil.valid || !settings.combat.recoil || recoil.owner != state.mouseOwner ||
-            recoil.weaponHandle != state.mouseWeapon || settings.combat.recoilInput != state.mouseMode ||
-            recoil.shots < state.mouseShots)
+        if (!active || !recoil.valid || !settings.combat.EnabledFor(recoil.weapon) ||
+            recoil.owner != state.mouseOwner || recoil.weaponHandle != state.mouseWeapon ||
+            settings.combat.recoilInput != state.mouseMode || recoil.shots < state.mouseShots)
             state.mouse.Reset();
         state.mouseOwner = recoil.owner;
         state.mouseWeapon = recoil.weaponHandle;
@@ -311,13 +326,66 @@ void AfterSetup(std::uintptr_t view) {
     }
     if (!fresh) {
         state.fov.Reset();
+        state.havePrediction = false;
+        state.predictionCadence.Reset();
         return;
     }
+    std::uint8_t life{}, scoped{};
+    int health{};
+    const bool alive = m.Field(state.client, offsets::LocalPawn, pawn) && pawn &&
+                       m.Field(pawn, offsets::LifeState, life) && !life && m.Field(pawn, offsets::Health, health) &&
+                       health > 0;
+    const bool zoomed = alive && m.Field(pawn, offsets::IsScoped, scoped) && scoped;
     float engine{};
     if (m.Field(view, abi::ViewFov, engine)) {
-        const float desired = state.fov.Update(engine, settings.cameraFovEnabled != 0, settings.cameraFov, now);
+        const float desired = camera_visuals::FrameFov(state.fov, engine, settings.cameraFovEnabled != 0,
+                                                       settings.cameraFov, zoomed, settings.cameraVisuals, now);
         if (desired != engine)
             SetFov(view, engine, desired);
+    }
+    Vector3 origin{}, angles{}, raw{};
+    const bool haveView = m.Field(view, abi::ViewOrigin, origin) && PlausiblePosition(origin) &&
+                          m.Field(view, abi::ViewAnglesField, angles) && Finite(angles);
+    NativeViewAngles rawView;
+    const bool haveRaw = ReadViewAngles(state.client + offsets::ViewAngles, rawView);
+    if (haveRaw)
+        raw = {rawView.pitch, rawView.yaw, rawView.roll};
+    LineupSample lineup;
+    if (alive && settings.lineups.enabled && haveRaw && m.Field(state.client, offsets::EntityList, list)) {
+        std::uintptr_t node{};
+        tracking::Sample weapon;
+        if (m.Field(pawn, offsets::SceneNode, node) && m.Field(node, offsets::Origin, lineup.feet) &&
+            PlausiblePosition(lineup.feet) && PlayerEye(m, pawn, lineup.eye) &&
+            ReadTrackingWeapon(m, list, pawn, weapon)) {
+            lineup.angles = raw;
+            lineup.weapon = weapon.weapon;
+            lineup.time = now;
+            lineup.valid = true;
+        }
+    }
+    {
+        std::scoped_lock lock(state.mutex);
+        state.output.lineup = lineup;
+    }
+    if (alive && haveView && settings.cameraVisuals.removeRecoil && haveRaw) {
+        raw.z = 0;
+        if (SetViewVector(view + abi::ViewAnglesField, angles, raw))
+            angles = raw;
+    }
+    if (alive && haveView && settings.cameraVisuals.thirdPerson && (!zoomed || settings.cameraVisuals.whileScoped) &&
+        state.sweepLayout) {
+        TraceContext cameraTrace;
+        cameraTrace.radius = 6;
+        cameraTrace.surfacePhysics = false;
+        std::uintptr_t physics{};
+        if (m.Field(state.client, abi::TraceManagerSlot, cameraTrace.manager) && m.Read(cameraTrace.manager, physics) &&
+            physics && InitializeFilter(cameraTrace, pawn)) {
+            const auto offset = camera_visuals::Offset(angles, settings.cameraVisuals);
+            flight::Collision collision;
+            if (Sweep(&cameraTrace, origin, origin + offset, collision))
+                SetViewVector(view + abi::ViewOrigin, origin,
+                              camera_visuals::Clipped(origin, offset, collision.fraction, collision.solid));
+        }
     }
     // Keep the input sample taken before setup, without evaluating it a second time.
 
@@ -325,23 +393,27 @@ void AfterSetup(std::uintptr_t view) {
     bool collisionReady = false;
     if (state.sweepLayout && settings.grenadePrediction && m.Field(state.client, offsets::EntityList, list) &&
         m.Field(state.client, offsets::LocalPawn, pawn)) {
-        Vector3 angles{};
+        Vector3 throwAngles{};
         flight::Throw input;
         TraceContext ctx;
         std::uintptr_t physics{};
         if (m.Field(state.client, abi::TraceManagerSlot, ctx.manager) && m.Read(ctx.manager, physics) && physics &&
-            m.Field(state.client, offsets::ViewAngles, angles) && ReadThrow(m, list, pawn, angles, input) &&
+            m.Field(state.client, offsets::ViewAngles, throwAngles) && ReadThrow(m, list, pawn, throwAngles, input) &&
             InitializeFilter(ctx, pawn)) {
             const auto &old = state.previousThrow;
             const bool unchanged =
                 state.havePrediction && input.type == old.type && Distance(input.eye, old.eye) < .01f &&
                 Distance(input.velocity, old.velocity) < .05f && std::abs(input.pitch - old.pitch) < .005f &&
                 std::abs(input.yaw - old.yaw) < .005f && std::abs(input.strength - old.strength) < .001f;
-            if (unchanged && now < state.nextPrediction)
+            if (state.havePrediction && !state.predictionCadence.Due(now, input.type, input.strength, unchanged))
                 return;
+            if (!state.havePrediction) {
+                state.predictionCadence.Reset();
+                state.predictionCadence.Due(now, input.type, input.strength, false);
+            }
             state.previousThrow = input;
             state.havePrediction = true;
-            state.nextPrediction = now + .1;
+
             prediction = flight::Predict(input, {&ctx, Sweep});
             collisionReady = prediction.valid;
         }
@@ -350,8 +422,10 @@ void AfterSetup(std::uintptr_t view) {
     state.output.prediction = prediction;
     state.output.predictedAt = now;
     state.output.collisionReady = collisionReady;
-    if (!prediction.valid)
+    if (!prediction.valid) {
         state.havePrediction = false;
+        state.predictionCadence.Reset();
+    }
     ++state.output.setupSamples;
 }
 void SetupHook(void *self) {
@@ -502,10 +576,11 @@ bool ReadEvent(void *event, EventData &data) noexcept {
             }
         }
         if (!std::strcmp(data.name, "player_footstep")) {
-            // Build 14181 GetPlayerPawn (slot 17); userid is a pawn field for this event.
-            if (table[17] != state.client + 0x9B4FE0)
-                return false;
-            data.pawn = reinterpret_cast<Controller>(table[17])(event, user);
+            // Dispatch paths may store userid as a controller or pawn.
+            // Validate accessors and then revalidate entity ownership before use.
+            data.controller = reinterpret_cast<Controller>(table[16])(event, user);
+            if (table[17] == state.client + 0x9B4FE0)
+                data.pawn = reinterpret_cast<Controller>(table[17])(event, user);
         }
         if (!std::strcmp(data.name, "player_hurt")) {
             if (table[abi::EventIntSlot] != state.client + abi::EventGetInt)
@@ -560,14 +635,25 @@ void CaptureEvent(void *event) {
     if (!std::strcmp(data.name, "inferno_startburn") || !std::strcmp(data.name, "inferno_expire") ||
         !std::strcmp(data.name, "inferno_extinguish")) {
         const bool burning = !std::strcmp(data.name, "inferno_startburn");
-        if (data.entityIndex > 0 && data.entityIndex <= static_cast<int>(offsets::EntryMask) &&
-            (!burning || PlausiblePosition(data.impact))) {
+        if (data.entityIndex > 0 && data.entityIndex <= static_cast<int>(offsets::EntryMask)) {
             LocalMemory local;
             Memory memory{&local, LocalMemory::Read};
             std::uintptr_t list{};
             std::uint32_t handle{};
-            if (memory.Field(state.client, offsets::EntityList, list))
-                FullHandle(memory, EntityAt(memory, list, data.entityIndex), handle);
+            if (memory.Field(state.client, offsets::EntityList, list)) {
+                const auto entity = EntityAt(memory, list, data.entityIndex);
+                FullHandle(memory, entity, handle);
+                if (burning && !PlausiblePosition(data.impact)) {
+                    std::uintptr_t scene{};
+                    std::uint32_t after{};
+                    if (!handle || !memory.Field(entity, offsets::SceneNode, scene) ||
+                        !memory.Field(scene, offsets::Origin, data.impact) || !PlausiblePosition(data.impact) ||
+                        !FullHandle(memory, entity, after) || after != handle)
+                        return;
+                }
+            }
+            if (burning && !PlausiblePosition(data.impact))
+                return;
             std::scoped_lock lock(state.mutex);
             state.output.infernos.Update(data.entityIndex, handle, data.impact, Seconds(), burning);
             ++state.output.infernoEvents;
@@ -579,7 +665,18 @@ void CaptureEvent(void *event) {
         Memory m{&local, LocalMemory::Read};
         std::uintptr_t list{};
         worldvisuals::Footstep sample;
-        if (m.Field(state.client, offsets::EntityList, list) && ReadFootstep(m, list, data.pawn, Seconds(), sample)) {
+        bool read = false;
+        if (m.Field(state.client, offsets::EntityList, list)) {
+            read = ReadFootstep(m, list, data.pawn, Seconds(), sample);
+            if (!read) {
+                std::uint32_t owner{}, pawnHandle{};
+                if (FullHandle(m, data.controller, owner) && EntityAt(m, list, owner) == data.controller &&
+                    m.Field(data.controller, offsets::ControllerPawn, pawnHandle))
+                    read = ReadFootstep(m, list, EntityAt(m, list, pawnHandle), Seconds(), sample) &&
+                           sample.handle == pawnHandle;
+            }
+        }
+        if (read) {
             std::scoped_lock lock(state.mutex);
             if (state.settings.worldVisuals.footsteps && state.output.footsteps.Add(sample))
                 ++state.output.footstepEvents;
@@ -633,9 +730,13 @@ void CaptureEvent(void *event) {
             EntityAt(m, list, attackerPawn) != localPawn || !FullHandle(m, localPawn, attackerController) ||
             attackerController != attackerPawn || !ReadHitPosition(m, pawn, handle, data.hitgroup, position))
             return;
+        std::array<char, 128> playerName{};
+        m.Field(data.controller, offsets::PlayerName, playerName);
+        playerName.back() = 0;
         std::scoped_lock lock(state.mutex);
-        if (state.settings.combat.hitMarker || state.settings.combat.hitSound || state.settings.combat.damageNumbers)
-            state.output.feedback.Add(handle, position, data.damage, data.hitgroup == 1, Seconds());
+        if (state.settings.combat.hitMarker || state.settings.combat.hitSound || state.settings.combat.damageNumbers ||
+            state.settings.combat.hitLog)
+            state.output.feedback.Add(handle, position, data.damage, data.hitgroup == 1, Seconds(), playerName.data());
         return;
     }
     Vector3 start{};
@@ -774,7 +875,7 @@ void RefreshTrajectoryInputs() noexcept {
 void PauseTrajectories() noexcept {
     state.deadline = 0;
 }
-void CopyTrajectories(FlightSnapshot &out) noexcept {
+void CopyTrajectories(FlightSnapshot &out, DeferredLog *logger) noexcept {
     const auto now = Seconds();
     bool log{}, recoilActive{}, fresh{};
     unsigned recoilInput{}, recoilRequested{};
@@ -793,7 +894,7 @@ void CopyTrajectories(FlightSnapshot &out) noexcept {
     }
     // File logging can block. Release the shared event/view snapshot lock before
     // formatting or writing diagnostics so engine callbacks can keep publishing.
-    if (log) {
+    if (log && logger) {
         char message[512]{};
         std::snprintf(message, sizeof(message),
                       "Telemetry: shots=%llu fire=%llu impacts=%llu effects=%llu accepted=%llu rejected=%llu live=%zu; "
@@ -803,13 +904,13 @@ void CopyTrajectories(FlightSnapshot &out) noexcept {
                       out.rejectedTracers, out.tracers.Lines().count, out.recoil.valid, out.recoil.weapon,
                       out.recoil.weaponHandle, out.recoil.shots, out.recoil.punch.x, out.recoil.punch.y, recoilInput,
                       out.recoilWrites, out.recoilReadFailures, static_cast<unsigned>(out.recoilResult));
-        OverlayLog(message);
+        logger->Push(message);
         std::snprintf(message, sizeof(message), "Input gate: active=%d fresh=%d requested=%u viewSamples=%llu.",
                       recoilActive, fresh, recoilRequested, out.setupSamples);
-        OverlayLog(message);
+        logger->Push(message);
         std::snprintf(message, sizeof(message), "Bullet sources: direct=%llu particle=%llu.", out.bulletCallbacks,
                       out.particleCallbacks);
-        OverlayLog(message);
+        logger->Push(message);
     }
     if (now - out.sampledAt > .25) {
         out.recoil = {};
@@ -865,7 +966,7 @@ HRESULT StopTrajectories() noexcept {
     state.installed = false;
     state.mouse.Reset();
     state.fov.Reset();
-    state.nextPrediction = 0;
+    state.predictionCadence.Reset();
     state.previousRecoil = 0;
     state.recoil.Reset();
     state.havePrediction = false;

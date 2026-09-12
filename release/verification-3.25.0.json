@@ -1,0 +1,29 @@
+{
+  "version": "3.25.0",
+  "deployedAt": "2026-09-11T20:39:10.6890625-04:00",
+  "offlineTestsPassed": 46,
+  "offlineTestsTotal": 46,
+  "gameAccessPerformed": false,
+  "publicReleasePushed": false,
+  "settingsUnchanged": true,
+  "settingsSha256": "A67CE5B3F513338E35F1BC5B9F1C46C178C4EACF8377DC76AFAB66333442C50C",
+  "installer": "C:\\Users\\Joshu\\AppData\\Local\\Vortex\\releases\\3.25.0-candidate\\Vortex-3.25.0-Setup.exe",
+  "dllCopies": [
+    {
+      "path": "C:\\Users\\Joshu\\AppData\\Local\\Vortex\\Build\\Release\\EntityAwarenessOverlay.dll",
+      "sha256": "B393E6A2070E8B99324BC01729E339ABAD05CF0C17B46CEC3F8483EE02202C20"
+    },
+    {
+      "path": "C:\\Users\\Joshu\\AppData\\Local\\Joshu.Vortex\\current\\EntityAwarenessOverlay.dll",
+      "sha256": "B393E6A2070E8B99324BC01729E339ABAD05CF0C17B46CEC3F8483EE02202C20"
+    },
+    {
+      "path": "C:\\Users\\Joshu\\OneDrive\\Desktop\\Vortex\\EntityAwarenessOverlay.dll",
+      "sha256": "B393E6A2070E8B99324BC01729E339ABAD05CF0C17B46CEC3F8483EE02202C20"
+    },
+    {
+      "path": "C:\\Users\\Joshu\\OneDrive\\Desktop\\CS2-Observer-Overlay\\EntityAwarenessOverlay.dll",
+      "sha256": "B393E6A2070E8B99324BC01729E339ABAD05CF0C17B46CEC3F8483EE02202C20"
+    }
+  ]
+}

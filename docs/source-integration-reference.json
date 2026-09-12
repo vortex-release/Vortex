@@ -1,0 +1,17 @@
+{
+  "project": "user-supplied cool stuff/cs2/velocity-cs2",
+  "files": {
+    "core/features/esp/item/item.overlay.cpp": "cfe29010a95f9db03d38a8e9cce8bbf2803badfd32b4034b70d63aa96e0edf01",
+    "core/features/esp/projectile/projectile.overlay.cpp": "a9782631a1141bf860363d245cd9fa9540c8f9ac6c74f02b7cf6e1470052d0bd",
+    "core/features/misc/impl/impacts.cpp": "b863ec853f166a1a1bb9c53e185d508645630810a2ced81c9a3f7ebcec0e0d5c",
+    "core/features/esp/player/player.chams.cpp": "7a895a6c62d95fddf384d8e7643fe638ed1afb515a253b0a8015a2dfdb4f27f0",
+    "core/features/esp/primitive_buffer.hpp": "dcd323a74dbaa215d489d443af1e4dae05fb382f48c8c98ae481113a19211468",
+    "core/systems/impl/materials.cpp": "7317874167999bd1eabd79b05128e8fa2c50a7b2b33cedf3c127921d9bc6bf0c",
+    "core/features/world/impl/scene.cpp": "ce27e72a8307a8d6d21759f06d34627995889092e73a7985d93e9b2c32b7fde2",
+    "core/features/misc/impl/camera.cpp": "de1a72f6ecfe2f699840729938e3892a6d37bd75a659cdb59e7c5ddbf5d3c4d9",
+    "core/features/movement/impl/airstrafe.cpp": "6b7bd14a5d5912e1e24f449cac2004f97718b4b49446ad03417282c7b2b77a67",
+    "core/features/movement/impl/bunnyhop.cpp": "05b52397b8c2a4b1159e1d57edf0184f09b1976caf17f32ce44888013d79ea48",
+    "core/features/combat/impl/legit.cpp": "5e1f1fc5c796c95730287a89f73995c90ca3d68ffaadbc3ef47a8336b421effd",
+    "core/systems/impl/legit_input.cpp": "602d7b3935c5de72bbab4b972688019250cf4b86c3eb63735cc42e414dbaff4b"
+  }
+}

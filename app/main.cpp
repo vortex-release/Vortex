@@ -1,3 +1,4 @@
+#include "../src/ui_icons.hpp"
 #include "app_paths.hpp"
 #include "capture.hpp"
 #include "app_config.hpp"
@@ -176,29 +177,10 @@ void Theme() {
     s.FontScaleDpi = uiScale;
 }
 void Icon(ImDrawList *d, ImVec2 p, int which, ImU32 color) {
-    const float s = uiScale;
-    const auto at = [&](float x, float y) { return ImVec2(p.x + x * s, p.y + y * s); };
-    if (which == 0) {
-        for (int y = 0; y < 2; ++y)
-            for (int x = 0; x < 2; ++x)
-                d->AddRect(at(x * 9.f, y * 9.f), at(x * 9.f + 5, y * 9.f + 5), color, 1.3f * s, 1.2f * s);
-    } else if (which == 1) {
-        d->AddLine(at(7, 0), at(7, 10), color, 1.3f * s);
-        d->AddLine(at(3, 6), at(7, 10), color, 1.3f * s);
-        d->AddLine(at(7, 10), at(11, 6), color, 1.3f * s);
-        d->AddLine(at(1, 12), at(1, 15), color, 1.3f * s);
-        d->AddLine(at(1, 15), at(13, 15), color, 1.3f * s);
-        d->AddLine(at(13, 15), at(13, 12), color, 1.3f * s);
-    } else if (which == 2) {
-        for (int i = 0; i < 3; ++i) {
-            d->AddLine(at(0, 2.f + i * 6), at(15, 2.f + i * 6), color, 1.2f * s);
-            d->AddCircleFilled(at(i == 1 ? 5.f : 10.f, 2.f + i * 6), 2.4f * s, color, 12);
-        }
-    } else {
-        d->AddRect(at(0, 0), at(18, 12), color, 2 * s, 1.2f * s);
-        d->AddLine(at(9, 12), at(9, 16), color, 1.2f * s);
-        d->AddLine(at(5, 16), at(13, 16), color, 1.2f * s);
-    }
+    constexpr vortex::icons::Id items[]{vortex::icons::Id::LayoutDashboard, vortex::icons::Id::Download,
+                                        vortex::icons::Id::SlidersHorizontal, vortex::icons::Id::Monitor,
+                                        vortex::icons::Id::Folder};
+    vortex::icons::Draw(d, items[std::clamp(which, 0, 4)], {p.x - 2 * uiScale, p.y - 2 * uiScale}, 19 * uiScale, color);
 }
 bool Navigation(const char *label, int icon, bool active) {
     const auto p = ImGui::GetCursorScreenPos();
@@ -296,8 +278,8 @@ bool ActionRow(const char *id, const char *title, const char *description, int i
     auto *d = ImGui::GetWindowDrawList();
     const auto pos = ImGui::GetWindowPos();
     const float right = pos.x + ImGui::GetWindowWidth() - 27 * s;
-    d->AddLine({right - 4 * s, pos.y + 37 * s}, {right, pos.y + 41 * s}, IM_COL32(148, 149, 163, 255), 1.2f * s);
-    d->AddLine({right, pos.y + 41 * s}, {right - 4 * s, pos.y + 45 * s}, IM_COL32(148, 149, 163, 255), 1.2f * s);
+    vortex::icons::Draw(d, vortex::icons::Id::ChevronRight, {right - 13 * s, pos.y + 31 * s}, 19 * s,
+                        ImGui::GetColorU32(muted));
     ImGui::SetCursorScreenPos(p);
     const bool clicked =
         ImGui::InvisibleButton("Open", {ImGui::GetContentRegionAvail().x, 43 * s}, ImGuiButtonFlags_EnableNav);
@@ -433,8 +415,9 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR command, int show) {
         std::vector<Process> processes;
         int selected{}, page{};
         std::future<std::string> loadWork;
+        Process pendingLoad, loadedTarget;
         bool loading{}, quit{};
-        std::string feedback;
+        std::string feedback, loadSuccessFeedback;
         int frames{};
         while (!quit) {
             MSG msg{};
@@ -458,11 +441,15 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR command, int show) {
             if (loading && loadWork.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
                 try {
                     feedback = loadWork.get();
+                    loadedTarget = pendingLoad;
+                    loadSuccessFeedback = feedback;
                 } catch (const std::exception &e) {
                     feedback = e.what();
                 }
                 Log(feedback);
                 loading = false;
+                // Refresh immediately: the target can close while a load operation completes.
+                lastRefresh = std::chrono::steady_clock::time_point{};
             }
             if (smoke)
                 page = frames / 10;
@@ -477,6 +464,16 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR command, int show) {
                     for (size_t i = 0; i < processes.size(); ++i)
                         if (processes[i].id == oldId)
                             selected = static_cast<int>(i);
+                    if (loadedTarget.id &&
+                        std::none_of(processes.begin(), processes.end(), [&](const Process &candidate) {
+                            return candidate.id == loadedTarget.id && candidate.created == loadedTarget.created;
+                        })) {
+                        // Only retire our old success notice; preserve any newer error or update feedback.
+                        if (feedback == loadSuccessFeedback)
+                            feedback = "Game closed.";
+                        loadedTarget = {};
+                        loadSuccessFeedback.clear();
+                    }
                 } catch (const std::exception &e) {
                     feedback = e.what();
                 }
@@ -553,7 +550,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR command, int show) {
             ImGui::BeginChild("Content", {0, 0}, ImGuiChildFlags_AlwaysUseWindowPadding, 0);
             if (page == 0) {
                 Heading("Library", 1.7f);
-                Hint("Your installed overlay.");
+
                 ImGui::Dummy({0, 10 * s});
                 Card("Counter-Strike 2", processes.size() > 1 ? 246.f : 222.f);
                 const auto pos = ImGui::GetCursorScreenPos();
@@ -591,11 +588,12 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR command, int show) {
                         ImGui::EndCombo();
                     }
                 } else
-                    Hint("The overlay is ready for this session.");
+                    Hint("Ready");
                 ImGui::SetCursorPosY((processes.size() > 1 ? 184.f : 162.f) * s);
                 ImGui::BeginDisabled(processes.empty() || loading || updater.Busy());
                 if (Primary(loading ? "Loading..." : "Launch overlay", {164, 40})) {
                     const auto process = processes[selected];
+                    pendingLoad = process;
                     loading = true;
                     feedback.clear();
                     loadWork = std::async(std::launch::async, [process, directory] {
@@ -607,9 +605,9 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR command, int show) {
                 ImGui::AlignTextToFramePadding();
                 Hint("Insert opens the menu");
                 EndCard();
-                if (ActionRow("Preview", "Preview your setup", "Adjust visuals in a simulated scene.", 3))
+                if (ActionRow("Preview", "Preview", "Offline visual preview", 3))
                     LaunchPreview(directory);
-                if (ActionRow("Profiles", "Profile library", "Open your saved configuration snapshots.", 2)) {
+                if (ActionRow("Profiles", "Profiles", "Saved configurations", 4)) {
                     const auto profiles = DataDirectory() / L"profiles";
                     std::filesystem::create_directories(profiles);
                     OpenPath(window, profiles);
@@ -620,7 +618,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR command, int show) {
                 }
             } else if (page == 1) {
                 Heading("Updates", 1.7f);
-                Hint("Manage your installed version.");
+
                 ImGui::Spacing();
                 Card("Update", std::max(290.f, ImGui::GetContentRegionAvail().y / s - 30.f));
                 ImGui::TextColored(accent, "Vortex %s", AppVersion);
@@ -658,13 +656,13 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR command, int show) {
                 EndCard();
             } else {
                 Heading("Settings", 1.7f);
-                Hint("Make Vortex work for you.");
+
                 ImGui::Spacing();
                 if (ImGui::BeginTabBar("LauncherPreferences")) {
                     if (ImGui::BeginTabItem("Appearance")) {
                         Card("Appearance", 212);
                         Heading("Interface", 1.15f);
-                        Hint("Font and motion preferences.");
+
                         ImGui::Spacing();
                         ImGui::TextUnformatted("Interface font");
                         ImGui::SetNextItemWidth(-1);
@@ -688,7 +686,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR command, int show) {
                                                             preferences.c_str()))
                                 feedback = "The animation preference could not be saved.";
                         EndCard();
-                        Hint("Overlay fonts and motion are configured separately in Settings > Interface.");
+
                         ImGui::EndTabItem();
                     }
                     if (ImGui::BeginTabItem("Updates")) {
@@ -705,7 +703,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR command, int show) {
                     if (ImGui::BeginTabItem("Files & support")) {
                         Card("Files", 220);
                         Heading("Profiles & support", 1.15f);
-                        Hint("Configuration snapshots, working settings and logs stay in your Windows user profile.");
+
                         if (ImGui::Button("Profile library")) {
                             const auto profiles = DataDirectory() / L"profiles";
                             std::filesystem::create_directories(profiles);
@@ -717,7 +715,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR command, int show) {
                         if (ImGui::Button("Open logs"))
                             OpenPath(window, LogDirectory());
                         ImGui::Spacing();
-                        Hint("Import, export and organize profiles in the overlay's Overview > My profiles.");
+                        Hint("Manage profiles in Overview > My profiles.");
                         EndCard();
                         ImGui::EndTabItem();
                     }

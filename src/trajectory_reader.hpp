@@ -1,4 +1,5 @@
 #pragma once
+#include "in_place_reset.hpp"
 #include "cs2_reader.hpp"
 #include <awareness/Trajectories.hpp>
 
@@ -99,7 +100,7 @@ class EntityDiscovery {
     double next_{}, previous_{};
 
   public:
-    void Reset() noexcept { *this = {}; }
+    void Reset() noexcept { ResetInPlace(*this); }
     template <class Visit> bool Scan(const Memory &m, std::uintptr_t list, double now, Visit &&visit) noexcept {
         if (!list || !std::isfinite(now)) {
             Reset();
@@ -155,7 +156,7 @@ class ProjectileTracker {
     double previous_{};
 
   public:
-    void Reset() noexcept { *this = {}; }
+    void Reset() noexcept { ResetInPlace(*this); }
     bool Update(const Memory &m, std::uintptr_t list, double now, ProjectileFrame &result) noexcept {
         result = {};
         if (!list || !std::isfinite(now)) {
@@ -223,7 +224,8 @@ inline bool ReadTracerEffect(const Memory &m, std::uintptr_t list, std::uintptr_
         char name[64]{};
         if (!EntityName(m, entity, name))
             return false;
-        if (!std::strcmp(name, "cs_player_pawn") || !std::strcmp(name, "player")) {
+        if (!std::strcmp(name, "cs_player_pawn") || !std::strcmp(name, "c_cs_player_for_precache") ||
+            !std::strcmp(name, "player")) {
             std::uint8_t team{};
             if (!m.Field(entity, offsets::Team, team) || team < 2 || team > 3)
                 return false;

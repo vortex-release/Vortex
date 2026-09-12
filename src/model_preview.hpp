@@ -10,6 +10,7 @@ struct GhostSurface {
     ID3D11RenderTargetView *target{};
     ID3D11DepthStencilView *depth{};
     bool mask{}, reversed{};
+    ID3D11ShaderResourceView *exclusions{};
 };
 class ModelPreview {
     struct Data;

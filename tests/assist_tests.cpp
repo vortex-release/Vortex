@@ -31,6 +31,8 @@ struct Fake {
         return true;
     }
     bool Mouse(bool down) { return Key(LeftMouse, down); }
+    bool Pistol(bool down) { return Key(LeftMouse, down); }
+    bool RestorePrimary() { return Key(LeftMouse, true); }
     bool Yaw(const Sample &, float value) {
         if (fail)
             return false;
@@ -48,7 +50,8 @@ struct Fake {
 };
 Sample Player() {
     Sample s;
-    s.valid = s.walking = s.enemy = s.weaponReady = true;
+    s.valid = s.walking = s.enemy = s.weaponReady = s.weaponKnown = s.readinessKnown = true;
+    s.movementKnown = s.velocityKnown = s.anglesKnown = true;
     s.owner = 1;
     s.weaponHandle = 7;
     s.weapon = 7;
@@ -145,6 +148,7 @@ int main() {
         Keys k;
         auto s = Player();
         o.shoot = 1;
+        o.shootMode = 0;
         k.down[Mouse4] = true;
         c.Step(o, s, k, 1, true, false, b);
         c.Step(o, s, k, 1.034, true, false, b);
@@ -200,9 +204,11 @@ int main() {
         k.down[Space] = true;
         auto s = Player();
         s.grounded = false;
+        s.tick = 100;
         c.Step(o, s, k, 2, true, false, b);
         Check(b.Count(Space, true) == 0, "airborne hold primes without jumping");
         s.grounded = true;
+        ++s.tick;
         c.Step(o, s, k, 2.004, true, false, b);
         Check(b.Count(Space, true) == 1, "first ground sample jumps");
         c.Step(o, s, k, 2.008, true, false, b);
@@ -211,6 +217,7 @@ int main() {
         c.Step(o, s, k, 2.012, true, false, b);
         Check(b.Count(Space, false) == 2, "takeoff releases synthetic jump");
         s.grounded = true;
+        ++s.tick;
         c.Step(o, s, k, 2.028, true, false, b);
         Check(b.Count(Space, true) == 2, "next landing immediately rearms");
         k.down[Space] = false;
@@ -224,6 +231,7 @@ int main() {
     {
         o = {};
         o.strafer = 1;
+        o.preserveForward = 0;
         Fake b;
         Controller c;
         Keys k;
@@ -279,18 +287,14 @@ int main() {
                         s.yaw = static_cast<float>(yaw);
                         k.down[A] = side == 1;
                         k.down[D] = side == -1;
-                        const float dt = .016f, limit = o.turnRate * dt;
+                        const float dt = .016f, limit = o.turnRate * o.strafeStrength * dt;
                         const auto plan = OptimizeStrafe(s, k, o, dt);
-                        float best = -1;
-                        for (int i = 0; i <= 200; ++i)
-                            best = std::max(
-                                best, PredictedSpeed(s, NormalizeYaw(s.yaw - limit + 2 * limit * i / 200), side, o));
                         Check(plan.forwardMove == 0 && plan.sideMove == -side * s.maxSpeed,
                               "Source movement vector uses the held strafe direction");
                         Check(plan.active && std::abs(NormalizeYaw(plan.yaw - s.yaw)) <= limit + .001f,
                               "strafe turn respects rate limit");
-                        Check(plan.predictedSpeed + .003f >= best,
-                              "strafe maximizes configured model within turn interval");
+                        Check(plan.predictedSpeed + .003f >= PredictedSpeed(s, s.yaw, side, o),
+                              "direction-respecting strafe never reduces predicted speed");
                     }
         s.velocity = {std::numeric_limits<float>::quiet_NaN(), 0, 0};
         Check(!OptimizeStrafe(s, k, o, .016f).active, "invalid velocity cannot steer");
@@ -299,6 +303,178 @@ int main() {
         s.grounded = false;
         s.water = .5f;
         Check(!IsAirborne(s), "swimming is not assisted air movement");
+    }
+    {
+        o = {};
+        o.shoot = 1;
+        o.delayMs = 0;
+        Fake b;
+        Controller c;
+        Keys k;
+        auto s = Player();
+        c.Step(o, s, k, 10, true, false, b);
+        Check(b.Count(LeftMouse, true) == 1, "always mode activates without a hidden hold key");
+        o.shootMode = 2;
+        c.Step(o, s, k, 10.01, true, false, b);
+        Check(c.GetStatus().shoot == Status::ToggleOff && b.Count(LeftMouse, false) == 1,
+              "switching to toggle mode starts inactive and releases owned fire");
+        k.down[Mouse4] = true;
+        c.Step(o, s, k, 10.11, true, false, b);
+        Check(b.Count(LeftMouse, true) == 2, "toggle activates on rising physical key edge");
+        c.Step(o, s, k, 10.14, true, false, b);
+        Check(c.GetStatus().shoot == Status::Target, "held toggle key does not toggle repeatedly");
+        k.down[Mouse4] = false;
+        c.Step(o, s, k, 10.15, true, false, b);
+        k.down[Mouse4] = true;
+        c.Step(o, s, k, 10.16, true, false, b);
+        Check(c.GetStatus().shoot == Status::ToggleOff, "second physical press toggles off");
+        k.down[Mouse4] = false;
+        c.Step(o, s, k, 10.17, true, false, b);
+        k.down[Mouse4] = true;
+        c.Step(o, s, k, 10.22, true, false, b);
+        c.Step(o, s, k, 10.23, false, false, b);
+        c.Step(o, s, k, 10.24, true, false, b);
+        Check(c.GetStatus().shoot == Status::ToggleOff, "focus loss resets toggle; held key cannot reactivate");
+        o.shootMode = 1;
+        s.weaponReady = false;
+        s.reloading = true;
+        c.Step(o, s, k, 10.25, true, false, b);
+        Check(c.GetStatus().shoot == Status::Reloading, "readiness diagnostics identify reload gate");
+        s.reloading = false;
+        s.empty = true;
+        c.Step(o, s, k, 10.26, true, false, b);
+        Check(c.GetStatus().shoot == Status::Empty, "readiness diagnostics identify empty magazine");
+    }
+    {
+        o = {};
+        o.strafer = 1;
+        Fake b;
+        Controller c;
+        Keys k;
+        k.down[A] = k.down[W] = true;
+        auto s = Player();
+        s.grounded = false;
+        const auto diagonal = OptimizeStrafe(s, k, o, .004f);
+        Check(diagonal.active && diagonal.forwardMove > 0 && diagonal.sideMove < 0,
+              "default strafe plan respects held forward plus side movement");
+        Check(std::abs(std::hypot(diagonal.forwardMove, diagonal.sideMove) - s.maxSpeed) < .001f,
+              "diagonal movement vector is normalized to configured movement speed");
+        c.Step(o, s, k, 11, true, false, b);
+        Check(b.Count(W, false) == 0 && c.SuppressedRepeats() == 0,
+              "default strafe does not release or suppress physical forward input");
+        o.strafeStrength = 0;
+        Check(!OptimizeStrafe(s, k, o, .004f).active, "zero strafe strength leaves camera untouched");
+        o.strafeStrength = 1;
+        s.tick = 100;
+        o.jumper = 1;
+        k.down[Space] = true;
+        c.Step(o, s, k, 11.01, true, false, b);
+        s.tick = 1;
+        s.grounded = true;
+        c.Step(o, s, k, 11.02, true, false, b);
+        Check(b.Count(Space, true) == 0, "tick rollback primes a fresh release instead of collapsing edges");
+        ++s.tick;
+        c.Step(o, s, k, 11.024, true, false, b);
+        Check(b.Count(Space, true) == 1, "new command tick after rollback rearms landing");
+    }
+    {
+        Options pulse;
+        pulse.shoot = 1;
+        pulse.shootMode = 1;
+        pulse.delayMs = 0;
+        pulse.pressMs = 40;
+        pulse.intervalMs = 600;
+        Controller c;
+        Fake b;
+        Keys k;
+        const auto s = Player();
+        c.Step(pulse, s, k, 20, true, false, b);
+        c.Step(pulse, s, k, 20.001, false, false, b, true);
+        Check(b.Count(LeftMouse, true) == 1 && b.Count(LeftMouse, false) == 1 && !c.PendingRelease(),
+              "disabled request cancels an owned click immediately before its scheduled release");
+        c.Step(pulse, s, k, 20.7, false, false, b, true);
+        Check(b.Count(LeftMouse, true) == 1, "paused request cannot emit another click after the repeat interval");
+    }
+    {
+        Options shooting;
+        shooting.shoot = 1;
+        shooting.delayMs = 0;
+        shooting.intervalMs = 100;
+        Controller c;
+        Fake b;
+        Keys k;
+        auto s = Player();
+        c.Step(shooting, s, k, 30, true, false, b);
+        s.enemy = false;
+        s.target = 0;
+        c.Step(shooting, s, k, 30.005, true, false, b);
+        s.enemy = true;
+        s.target = 5;
+        c.Step(shooting, s, k, 30.01, true, false, b);
+        c.Step(shooting, s, k, 30.099, true, false, b);
+        Check(b.Count(LeftMouse, true) == 1,
+              "briefly losing and reacquiring a target cannot bypass the click interval");
+        c.Step(shooting, s, k, 30.101, true, false, b);
+        Check(b.Count(LeftMouse, true) == 2, "reacquired target fires when the original interval expires");
+        s.weaponHandle = 8;
+        s.weapon = 16;
+        c.Step(shooting, s, k, 30.11, true, false, b);
+        Check(b.Count(LeftMouse, true) == 3, "verified new weapon gets its own cadence and readiness gate");
+    }
+    {
+        Options movement;
+        movement.strafer = 1;
+        movement.preserveForward = 0;
+        Controller c;
+        Fake b;
+        Keys k;
+        k.down[A] = k.down[W] = true;
+        auto s = Player();
+        s.grounded = false;
+        s.yaw = 35;
+        c.Step(movement, s, k, 40, true, false, b);
+        const float firstTurn = std::abs(NormalizeYaw(b.yaw - s.yaw));
+        float lastTurn{};
+        for (unsigned i = 1; i <= 20; ++i) {
+            c.Step(movement, s, k, 40 + i * .004, true, false, b);
+            lastTurn = std::abs(NormalizeYaw(b.yaw - s.yaw));
+            Check(lastTurn <= movement.turnRate * movement.strafeStrength * .004f + .001f,
+                  "steering ramp never exceeds configured angular speed");
+        }
+        const auto fullPlan = OptimizeStrafe(s, k, movement, .004f);
+        Check(firstTurn < lastTurn * .1f && std::abs(lastTurn - std::abs(NormalizeYaw(fullPlan.yaw - s.yaw))) < .001f,
+              "steering starts gently and reaches full selected strength after the ramp duration");
+        const auto turns = b.turns;
+        k.down[LeftShift] = true;
+        c.Step(movement, s, k, 40.084, true, false, b);
+        Check(b.turns == turns && b.Count(W, true) == 1 && c.GetStatus().strafe == Status::Walking,
+              "holding walking modifier yields steering and restores physically held forward input");
+        k.down[LeftShift] = false;
+        k.down[RightShift] = true;
+        c.Step(movement, s, k, 40.088, true, false, b);
+        Check(b.turns == turns, "right Shift has the same walking override");
+        k.down[RightShift] = false;
+        c.Step(movement, s, k, 40.092, true, false, b);
+        Check(std::abs(NormalizeYaw(b.yaw - s.yaw)) < lastTurn * .1f,
+              "releasing walking restarts the gentle steering ramp");
+        movement.strafeRampMs = 0;
+        k.down[LeftShift] = true;
+        movement.strafeWalkPause = 0;
+        c.Step(movement, s, k, 40.096, true, false, b);
+        Check(b.turns == turns + 2 && std::abs(std::abs(NormalizeYaw(b.yaw - s.yaw)) - lastTurn) < .001f,
+              "both new movement behaviors can be disabled independently");
+        k.down[LeftShift] = false;
+        movement.strafeRampMs = 80;
+        k.down[A] = false;
+        k.down[D] = true;
+        c.Step(movement, s, k, 40.1, true, false, b);
+        Check(std::abs(NormalizeYaw(b.yaw - s.yaw)) < lastTurn * .1f,
+              "changing strafe direction ramps from rest instead of snapping");
+        movement.strafeRampMs = std::numeric_limits<float>::quiet_NaN();
+        Check(!Valid(movement), "nonfinite steering ramp rejected");
+        movement.strafeRampMs = 80;
+        movement.strafeWalkPause = 2;
+        Check(!Valid(movement), "invalid walk-override flag rejected");
     }
     {
         PhysicalInput physical;
@@ -323,6 +499,28 @@ int main() {
         Sample s;
         Check(ReadAssistSample(f.memory, f.addresses, s) && CrosshairEnemy(s) && s.weaponReady && s.grounded,
               "Source 2 reader resolves enemy, firearm readiness and ground flag");
+        std::array<char, 32> liveType{};
+        std::memcpy(liveType.data(), "c_cs_player_for_precache", sizeof("c_cs_player_for_precache"));
+        f.Put(Fixture::base + 0x86000, liveType);
+        f.Put(Fixture::base + 0x87000, liveType);
+        Check(ReadAssistSample(f.memory, f.addresses, s) && s.weaponReady && CrosshairEnemy(s),
+              "verified live precache pawn designer name supports local and target identity");
+        std::memset(liveType.data(), 0, liveType.size());
+        std::memcpy(liveType.data(), "weapon_ak47", sizeof("weapon_ak47"));
+        f.Put(Fixture::base + 0x87000, liveType);
+        Check(ReadAssistSample(f.memory, f.addresses, s) && !CrosshairEnemy(s),
+              "accepting live pawn alias never admits a weapon designer name");
+        std::memset(liveType.data(), 0, liveType.size());
+        std::memcpy(liveType.data(), "c_cs_player_for_precache", sizeof("c_cs_player_for_precache"));
+        f.Put(Fixture::base + 0x87000, liveType);
+        f.Put(f.addresses.angles, NativeViewAngles{std::numeric_limits<float>::quiet_NaN(), 0, 0});
+        Check(ReadAssistSample(f.memory, f.addresses, s) && s.weaponReady && CrosshairEnemy(s) && !s.anglesKnown,
+              "unavailable view angles do not disable independent crosshair shooting or jumping");
+        f.Put(f.addresses.angles, NativeViewAngles{});
+        f.Put(Fixture::pawn + offsets::WaterLevel, std::numeric_limits<float>::quiet_NaN());
+        Check(ReadAssistSample(f.memory, f.addresses, s) && s.weaponReady && !Movable(s),
+              "invalid movement data disables movement only, preserving verified shooting data");
+        f.Put(Fixture::pawn + offsets::WaterLevel, 0.f);
         f.Put(Fixture::enemy + offsets::Team, std::uint8_t{2});
         Check(ReadAssistSample(f.memory, f.addresses, s) && !CrosshairEnemy(s), "same team is never eligible");
         f.Put(Fixture::enemy + offsets::Team, std::uint8_t{3});
@@ -351,6 +549,257 @@ int main() {
         Check(ReadAssistSample(f.memory, f.addresses, s) && !IsAirborne(s), "ladder excluded by movement type");
         f.Put(Fixture::pawn + offsets::LifeState, std::uint8_t{1});
         Check(!ReadAssistSample(f.memory, f.addresses, s) && !s.valid, "dead local pawn clears sample");
+    }
+    {
+        Options jump;
+        jump.jumper = 1;
+        Controller c;
+        Fake b;
+        Keys k;
+        k.down[Space] = true;
+        auto s = Player();
+        s.tick = 200;
+        c.Step(jump, s, k, 50, true, false, b);
+        Check(b.Count(Space, false) == 1 && b.Count(Space, true) == 0,
+              "ground engagement never sends jump up and down in the same poll");
+        c.Step(jump, s, k, 50.004, true, false, b);
+        Check(b.Count(Space, true) == 0, "unchanged ground tick waits for the release to be observed");
+        ++s.tick;
+        c.Step(jump, s, k, 50.008, true, false, b);
+        Check(b.Count(Space, true) == 1, "fresh ground command observes release then jumps");
+        c.Step(jump, s, k, 50.032, true, false, b);
+        Check(b.Count(Space, false) == 1, "jump pulse is held through two simulation tick intervals");
+        c.Step(jump, s, k, 50.040, true, false, b);
+        Check(b.Count(Space, false) == 2 && b.Count(Space, true) == 1,
+              "missed grounded jump releases without same-poll repress");
+        ++s.tick;
+        c.Step(jump, s, k, 50.044, true, false, b);
+        Check(b.Count(Space, true) == 2, "missed ground edge retries promptly instead of waiting 150 milliseconds");
+        s.grounded = false;
+        c.Step(jump, s, k, 50.048, true, false, b);
+        for (int i = 1; i < 20; ++i)
+            c.Step(jump, s, k, 50.048 + i * .004, true, false, b);
+        Check(b.Count(Space, true) == 2, "airborne frames do not consume jump press edges");
+        c.Stop(b, k);
+        s.grounded = true;
+        s.tick = 0;
+        c.Step(jump, s, k, 51, true, false, b);
+        c.Step(jump, s, k, 51.004, true, false, b);
+        Check(b.Count(Space, true) == 2, "missing tick still requires a separate release interval");
+        c.Step(jump, s, k, 51.016, true, false, b);
+        Check(b.Count(Space, true) == 3, "elapsed tick interval provides safe missing-tick recovery");
+    }
+    {
+        PhysicalInput physical;
+        physical.RelativeMouse(-5);
+        physical.RelativeMouse(2);
+        const auto first = physical.Snapshot();
+        Check(first.mouseTravelX == -3 && first.mouseSequence == 2,
+              "relative mouse samples accumulate without consumption");
+        physical.RelativeMouse(50, MOUSE_MOVE_ABSOLUTE);
+        physical.RelativeMouse(50, MOUSE_MOVE_RELATIVE, InputTag);
+        Check(physical.Snapshot().mouseTravelX == first.mouseTravelX &&
+                  physical.Snapshot().mouseSequence == first.mouseSequence,
+              "absolute pointer moves and synthetic mouse motion cannot steer");
+        physical.Event(WM_KILLFOCUS, 0, 0);
+        Check(physical.Snapshot().mouseSequence == 0 && physical.Snapshot().mouseTravelX == 0,
+              "focus loss drops old mouse direction");
+    }
+    {
+        Options move;
+        move.strafer = 1;
+        move.strafeMode = 1;
+        move.preserveForward = 0;
+        Controller c;
+        Fake b;
+        Keys k;
+        auto s = Player();
+        s.grounded = false;
+        k.down[Space] = k.down[W] = true;
+        c.Step(move, s, k, 60, true, false, b);
+        Check(b.events.empty() && b.turns == 0, "mouse mode waits for real motion instead of alternating A/D");
+        k.mouseTravelX = -8;
+        ++k.mouseSequence;
+        c.Step(move, s, k, 60.004, true, false, b);
+        Check(b.Count(A, true) == 1 && b.Count(W, false) == 1 && b.turns == 0,
+              "left mouse movement presses A without rotating camera");
+        c.Step(move, s, k, 60.008, true, false, b);
+        Check(b.Count(A, true) == 1, "mouse side is held without repeating key-down each worker poll");
+        k.mouseTravelX += 20;
+        ++k.mouseSequence;
+        c.Step(move, s, k, 60.012, true, false, b);
+        Check(b.Count(A, false) == 1 && b.Count(D, true) == 1,
+              "mouse direction switch releases old side before pressing new side");
+        k.down[A] = true;
+        c.Step(move, s, k, 60.016, true, false, b);
+        Check(b.Count(D, false) == 1 && b.Count(W, true) == 1 && c.GetStatus().strafe == Status::ManualInput,
+              "physical A/D takes over and restores held forward input");
+        k.down[A] = false;
+        c.Step(move, s, k, 60.020, true, false, b);
+        Check(b.Count(A, true) == 1 && b.Count(D, true) == 1, "manual takeover discards stale mouse direction");
+        k.mouseTravelX -= 10;
+        ++k.mouseSequence;
+        c.Step(move, s, k, 60.024, true, false, b);
+        c.Step(move, s, k, 60.078, true, false, b);
+        Check(b.Count(A, false) == 2 && b.Count(W, true) == 2,
+              "stopped mouse releases owned side and restores forward");
+        k.mouseTravelX += 10;
+        ++k.mouseSequence;
+        c.Step(move, s, k, 60.082, true, false, b);
+        s.grounded = true;
+        c.Step(move, s, k, 60.086, true, false, b);
+        Check(b.Count(D, false) == 2 && b.turns == 0, "landing releases mouse strafe with camera untouched throughout");
+        s.grounded = false;
+        k.mouseTravelX -= 10;
+        ++k.mouseSequence;
+        c.Step(move, s, k, 60.090, true, false, b);
+        c.Step(move, s, k, 60.094, false, false, b);
+        Check(!c.PendingRelease(), "pause relinquishes all synthetic movement ownership");
+    }
+    {
+        Options pistol;
+        pistol.autoPistol = 1;
+        pistol.pistolIntervalMs = 100;
+        Controller c;
+        Fake b;
+        Keys k;
+        auto s = Player();
+        s.weapon = 32;
+        s.enemy = false;
+        s.target = 0;
+        k.down[LeftMouse] = true;
+        c.Step(pistol, s, k, 70, true, false, b);
+        Check(b.Count(LeftMouse, false) == 1 && b.Count(LeftMouse, true) == 0,
+              "auto-pistol primes a released edge after manual click");
+        c.Step(pistol, s, k, 70.004, true, false, b);
+        Check(b.Count(LeftMouse, true) == 0, "auto-pistol never combines press and release in one input interval");
+        c.Step(pistol, s, k, 70.016, true, false, b);
+        Check(b.Count(LeftMouse, true) == 1, "held pistol repeats when weapon ready without requiring an enemy target");
+        c.Step(pistol, s, k, 70.037, true, false, b);
+        c.Step(pistol, s, k, 70.100, true, false, b);
+        Check(b.Count(LeftMouse, true) == 1, "auto-pistol honors its distinct repeat interval");
+        s.weaponReady = false;
+        s.cooldown = true;
+        c.Step(pistol, s, k, 70.120, true, false, b);
+        Check(b.Count(LeftMouse, true) == 1, "auto-pistol always respects actual weapon cooldown");
+        s.weaponReady = true;
+        s.cooldown = false;
+        c.Step(pistol, s, k, 70.124, true, false, b);
+        Check(b.Count(LeftMouse, true) == 2, "ready pistol fires after cooldown without adding reaction delay");
+        k.down[LeftMouse] = false;
+        c.Step(pistol, s, k, 70.128, true, false, b);
+        Check(b.Count(LeftMouse, false) == 3 && !c.PendingRelease(),
+              "releasing manual fire immediately releases auto-pistol ownership");
+        for (auto id : {63, 64, 7, 9, 0})
+            Check(!SemiAutomaticPistol(static_cast<std::uint16_t>(id)),
+                  "automatic charge and nonpistol weapons are excluded");
+        for (auto id : {1, 2, 3, 4, 30, 32, 36, 61})
+            Check(SemiAutomaticPistol(static_cast<std::uint16_t>(id)), "known semi-pistol is supported");
+        k.down[LeftMouse] = true;
+        c.Step(pistol, s, k, 70.132, true, false, b);
+        const auto downs = b.Count(LeftMouse, true);
+        pistol.autoPistol = 0;
+        c.Step(pistol, s, k, 70.136, true, false, b);
+        Check(b.Count(LeftMouse, true) == downs + 1 && !c.PendingRelease(),
+              "disabling auto-pistol restores a physically held button");
+        pistol.autoPistol = 1;
+        c.Step(pistol, s, k, 70.140, true, false, b);
+        const auto beforePause = b.Count(LeftMouse, true);
+        c.Step(pistol, s, k, 70.144, false, false, b);
+        Check(b.Count(LeftMouse, true) == beforePause && !c.PendingRelease(),
+              "focus pause cannot restore mouse down into another application");
+    }
+    {
+        Fixture f;
+        Sample s;
+        f.Put(Fixture::services + cs2::offsets::ActiveWeapon, std::uint32_t{});
+        Check(cs2::ReadAssistSample(f.memory, f.addresses, s) && s.tick == 1001 && !s.weaponReady,
+              "movement command timing remains available without an equipped firearm");
+        Options badAssist;
+        badAssist.strafeMode = 2;
+        Check(!Valid(badAssist), "unknown strafe mode rejected");
+        badAssist = {};
+        badAssist.autoPistol = 2;
+        Check(!Valid(badAssist), "invalid auto-pistol flag rejected");
+        badAssist = {};
+        badAssist.pistolIntervalMs = std::numeric_limits<float>::quiet_NaN();
+        Check(!Valid(badAssist), "nonfinite pistol interval rejected");
+    }
+    {
+        PhysicalInput physical;
+        physical.Event(WM_KEYDOWN, 'Y', 0, 0, false);
+        Check(!physical.Snapshot().textInput,
+              "typing a profile name inside the overlay does not enter game chat state");
+        physical.Event(WM_KEYUP, 'Y', 0, 0, false);
+        physical.Event(WM_KEYDOWN, 'Y', 0);
+        Check(physical.Snapshot().textInput, "gameplay chat shortcut still pauses assists");
+        physical.Event(WM_KEYDOWN, VK_RETURN, 0, 0, false);
+        Check(physical.Snapshot().textInput, "overlay text entry does not dismiss a preexisting game chat pause");
+        physical.Event(WM_KEYDOWN, VK_ESCAPE, 0);
+        Check(!physical.Snapshot().textInput, "gameplay escape exits chat pause");
+        Options move;
+        move.strafer = 1;
+        move.strafeMode = 1;
+        Controller c;
+        Fake b;
+        Keys k;
+        auto sample = Player();
+        sample.grounded = false;
+        k.down[Space] = true;
+        c.Step(move, sample, k, 80, true, false, b);
+        k.mouseTravelX = -10;
+        ++k.mouseSequence;
+        c.Step(move, sample, k, 80.004, true, false, b);
+        k.textInput = true;
+        c.Step(move, sample, k, 80.008, true, false, b);
+        Check(b.Count(A, false) == 1 && !c.PendingRelease() && c.GetStatus().strafe == Status::Paused,
+              "chat entry releases synthetic steering even when caller active flag is stale");
+    }
+    {
+        o = {};
+        o.autoPistol = 1;
+        o.shoot = 1;
+        o.delayMs = 0;
+        Fake b;
+        Controller c;
+        Keys k;
+        auto s = Player();
+        s.weapon = 32;
+        k.down[LeftMouse] = true;
+        c.Step(o, s, k, 90, true, false, b);
+        c.Step(o, s, k, 90.016, true, false, b);
+        k.down[LeftMouse] = false;
+        c.Step(o, s, k, 90.020, true, false, b);
+        Check(b.Count(LeftMouse, true) == 1 && b.Count(LeftMouse, false) == 2,
+              "auto-pistol releases before handing the button back to assisted shoot");
+        c.Step(o, s, k, 90.024, true, false, b);
+        Check(b.Count(LeftMouse, true) == 1, "input owner handoff cannot collapse a release and new shot");
+        c.Step(o, s, k, 90.036, true, false, b);
+        Check(b.Count(LeftMouse, true) == 2, "working assisted shoot resumes after a distinct button release interval");
+    }
+    {
+        o = {};
+        o.strafer = 1;
+        o.strafeMode = 1;
+        Fake b;
+        Controller c;
+        Keys k;
+        auto s = Player();
+        s.grounded = false;
+        k.down[Space] = true;
+        c.Step(o, s, k, 100, true, false, b);
+        k.mouseTravelX = -5;
+        ++k.mouseSequence;
+        c.Step(o, s, k, 100.004, true, false, b);
+        b.fail = true;
+        k.mouseTravelX += 10;
+        ++k.mouseSequence;
+        c.Step(o, s, k, 100.008, true, false, b);
+        Check(b.Count(D, true) == 0 && c.PendingRelease(), "failed side release cannot press the opposite direction");
+        b.fail = false;
+        c.Step(o, s, k, 100.012, false, false, b);
+        Check(b.Count(A, false) == 1 && !c.PendingRelease(),
+              "failed steering release is retained and retried during pause");
     }
     std::printf("Assist checks: %u checks, %u failures; synthetic input backend only.\n", checks, failures);
     return failures ? 1 : 0;

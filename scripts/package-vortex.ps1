@@ -48,7 +48,7 @@ try {
     New-Item -ItemType Directory -Path $profileStage -Force | Out-Null
     Get-ChildItem -LiteralPath (Join-Path $project 'profile') | Where-Object Name -ne 'background.png' |
         ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $profileStage -Recurse }
-    foreach ($name in @('Dear-ImGui-LICENSE.txt','MinHook-LICENSE.txt','Valve-Assets-NOTICE.txt','Velopack-LICENSE.txt','nlohmann-json-LICENSE.txt')) {
+    foreach ($name in @('Dear-ImGui-LICENSE.txt','MinHook-LICENSE.txt','Valve-Assets-NOTICE.txt','Velopack-LICENSE.txt','nlohmann-json-LICENSE.txt','Lucide-LICENSE.txt','Lefrizzel-Ai-LICENSE.txt')) {
         Copy-Item -LiteralPath (Join-Path $project "licenses\$name") -Destination $stage
     }
     Copy-Item -LiteralPath (Join-Path $project 'LICENSE') -Destination (Join-Path $stage 'LICENSE.txt')

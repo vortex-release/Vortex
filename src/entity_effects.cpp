@@ -204,7 +204,7 @@ HRESULT EntityEffects::Resize(ID3D11Device *device, UINT width, UINT height) {
 HRESULT EntityEffects::Render(ID3D11Device *device, ID3D11DeviceContext *context, ID3D11RenderTargetView *target,
                               const D3D11_TEXTURE2D_DESC &desc, ID3D11DepthStencilView *depth, bool reversed,
                               const Matrix4x4 &matrix, Viewport view, std::span<const EffectVertex> vertices,
-                              const EffectsConfiguration &config, EffectsState &state) {
+                              const EffectsConfiguration &config, EffectsState &state, bool visibleOnly) {
     state.depthAvailable = 0;
     if (!config.materialEnabled && !config.glowEnabled) {
         state.status = EffectsStatus::Disabled;
@@ -221,7 +221,7 @@ HRESULT EntityEffects::Render(ID3D11Device *device, ID3D11DeviceContext *context
         state.status = EffectsStatus::UnsupportedTarget;
         return S_FALSE;
     }
-    if (config.visibility != EffectVisibility::AlwaysVisible && !state.depthAvailable) {
+    if ((visibleOnly || config.visibility != EffectVisibility::AlwaysVisible) && !state.depthAvailable) {
         state.status = EffectsStatus::DepthUnavailable;
         return S_FALSE;
     }
@@ -232,8 +232,8 @@ HRESULT EntityEffects::Render(ID3D11Device *device, ID3D11DeviceContext *context
     state.status = EffectsStatus::Failed;
     HRESULT hr;
     CHECK(Initialize(device));
-    const bool stencilFill =
-        config.materialEnabled && !config.glowEnabled && config.visibility == EffectVisibility::AlwaysVisible;
+    const bool stencilFill = config.materialEnabled && !config.glowEnabled &&
+                             config.visibility == EffectVisibility::AlwaysVisible && !visibleOnly;
     if (!stencilFill)
         CHECK(Resize(device, desc.Width, desc.Height));
     if (vertices.size() > capacity_) {
@@ -312,8 +312,11 @@ HRESULT EntityEffects::Render(ID3D11Device *device, ID3D11DeviceContext *context
     const float clear[4]{};
     context->ClearRenderTargetView(rt, clear);
     const bool occluded = config.visibility == EffectVisibility::OccludedOnly;
-    context->OMSetRenderTargets(1, &rt, occluded ? depth : nullptr);
-    context->OMSetDepthStencilState(occluded ? (reversed ? behindReversed_.Get() : behind_.Get()) : always_.Get(), 0);
+    context->OMSetRenderTargets(1, &rt, (occluded || visibleOnly) ? depth : nullptr);
+    context->OMSetDepthStencilState(visibleOnly ? (reversed ? visibleReversed_.Get() : visible_.Get())
+                                    : occluded  ? (reversed ? behindReversed_.Get() : behind_.Get())
+                                                : always_.Get(),
+                                    0);
     context->OMSetBlendState(coverageBlend_.Get(), nullptr, 0xFFFFFFFF);
     auto *vb = vertices_.Get();
     const UINT stride = sizeof(EffectVertex), offset = 0;

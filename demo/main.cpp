@@ -373,7 +373,8 @@ struct ProfileBackup {
     }
 };
 void Smoke(Graphics &g, const std::filesystem::path &directory) {
-    // Render the same stroke primitive in an isolated WARP scene before loading the DLL.
+    // Exercise the optional decorative ImGui stroke in an isolated WARP scene.
+    // Depth-aware production trajectories have their own GPU fixture.
     {
         struct DrawScope {
             ImGuiContext *previous{ImGui::GetCurrentContext()};
@@ -397,7 +398,17 @@ void Smoke(Graphics &g, const std::filesystem::path &directory) {
         ImGui_ImplDX11_NewFrame();
         ImGui::NewFrame();
         auto *draw = ImGui::GetBackgroundDrawList();
-        const flight::PathStyle style;
+        flight::PathStyle style;
+        // This fixture intentionally checks optional glow, independent of the
+        // quieter no-glow defaults used by new profiles.
+        style.trailGlow = style.shotGlow = 1;
+        style.trailStrength = 2.f;
+        style.shotStrength = 2.4f;
+        style.trailWidth = 2.4f;
+        style.shotWidth = 2.2f;
+        style.previewWidth = 1.6f;
+        style.shotStart = {1.f, .75f, .12f, 1.f};
+        style.shotEnd = style.shotCore = {1.f, 1.f, 1.f, 1.f};
         draw->AddText({100, 95}, IM_COL32_WHITE, "Held preview");
         draw->AddText({100, 245}, IM_COL32_WHITE, "Flight trail");
         draw->AddText({100, 445}, IM_COL32_WHITE, "Bullet tracer");
@@ -435,7 +446,7 @@ void Smoke(Graphics &g, const std::filesystem::path &directory) {
                 "held preview stays sharp while actual flight has an outer glow");
         g.VerifyState();
         g.VerifyDepth();
-        Pass("production stroke GPU pixels and glow comparison image");
+        Pass("optional decorative stroke GPU pixels and glow comparison image");
         ImGui_ImplDX11_NewFrame();
         ImGui::NewFrame();
         draw = ImGui::GetBackgroundDrawList();
@@ -843,10 +854,16 @@ void Smoke(Graphics &g, const std::filesystem::path &directory) {
                         "trajectory switches persist");
             clickItem("Bullets");
             SaveBitmap(directory / L"vortex-tracers.bmp", g.ReadPixels(), g.width, g.height);
+            const auto initialShotGlow = GetPrivateProfileIntW(L"Visual", L"paths.shotGlow", 99, profile.path.c_str());
+            const auto initialTrailGlow = GetPrivateProfileIntW(L"Visual", L"paths.trailGlow", 99, profile.path.c_str());
+            const auto initialPreviewGlow = GetPrivateProfileIntW(L"Visual", L"paths.previewGlow", 99, profile.path.c_str());
+            Require(initialShotGlow <= 1, "saved bullet glow is a valid toggle");
             clickItem("Glow");
             clickItem("Save");
-            Require(GetPrivateProfileIntW(L"Visual", L"paths.shotGlow", 99, profile.path.c_str()) == 0,
-                    "bullet glow independent");
+            Require(GetPrivateProfileIntW(L"Visual", L"paths.shotGlow", 99, profile.path.c_str()) == 1 - initialShotGlow &&
+                        GetPrivateProfileIntW(L"Visual", L"paths.trailGlow", 99, profile.path.c_str()) == initialTrailGlow &&
+                        GetPrivateProfileIntW(L"Visual", L"paths.previewGlow", 99, profile.path.c_str()) == initialPreviewGlow,
+                    "bullet glow toggles independently of utility glow");
             clickItem("Glow");
             clickItem("Assists");
             clickItem("Assisted Shoot");

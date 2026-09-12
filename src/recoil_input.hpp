@@ -1,5 +1,6 @@
 #pragma once
 #include "combat_features.hpp"
+#include "assist_input_state.hpp"
 #include <Windows.h>
 namespace awareness::combat {
 // Preserve sub-pixel movement. Rounding each frame to an integer loses nearly all
@@ -34,6 +35,7 @@ class MouseRecoil {
         input.mi.dx = dx;
         input.mi.dy = dy;
         input.mi.dwFlags = MOUSEEVENTF_MOVE | MOUSEEVENTF_MOVE_NOCOALESCE;
+        input.mi.dwExtraInfo = assist::InputTag;
         if (send(input) != 1)
             return E_ACCESSDENIED; // caller restores only this correction
         x_ = x - dx;

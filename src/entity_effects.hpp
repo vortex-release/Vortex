@@ -32,6 +32,6 @@ class EntityEffects {
     UINT StencilAllocations() const noexcept { return stencilAllocations_; }
     HRESULT Render(ID3D11Device *, ID3D11DeviceContext *, ID3D11RenderTargetView *, const D3D11_TEXTURE2D_DESC &,
                    ID3D11DepthStencilView *, bool reversed, const Matrix4x4 &, Viewport, std::span<const EffectVertex>,
-                   const EffectsConfiguration &, EffectsState &);
+                   const EffectsConfiguration &, EffectsState &, bool visibleOnly = false);
 };
 } // namespace awareness

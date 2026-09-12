@@ -1,6 +1,9 @@
 #pragma once
 #include "cs2_glow.hpp"
+#include <atomic>
+#include <memory>
 #include <span>
+#include <utility>
 #include <string_view>
 #include <vector>
 
@@ -143,38 +146,74 @@ inline std::uint32_t PackColor(Color color, float opacity) noexcept {
     const auto byte = [](float x) { return static_cast<std::uint32_t>(std::lround(std::clamp(x, 0.f, 1.f) * 255.f)); };
     return byte(color.r) | byte(color.g) << 8 | byte(color.b) << 16 | byte(color.a * opacity) << 24;
 }
-// Original geometry is drawn between the hidden and visible layers so visible
-// alpha blends over the original material, rather than over the hidden color.
-// The packet belongs to the engine: only copies are ever modified.
-template <class Draw>
-void DrawLayers(const Packet &packet, const Target &target, const EffectsConfiguration &config,
-                std::uintptr_t visibleMaterial, std::uintptr_t hiddenMaterial, Draw &&draw) {
-    auto copy = packet;
-    const auto hidden = config.visibility == EffectVisibility::TwoColor ? config.glowColor : config.materialColor;
-    if (hidden.a * target.opacity > 0) {
-        copy.Set(offsets::PacketMaterial, hiddenMaterial);
-        copy.Set(offsets::PacketColor, PackColor(hidden, target.opacity));
-        draw(copy);
-    }
-    draw(packet);
-    if (config.visibility == EffectVisibility::TwoColor && config.materialColor.a * target.opacity > 0) {
-        copy.Set(offsets::PacketMaterial, visibleMaterial);
-        copy.Set(offsets::PacketColor, PackColor(config.materialColor, target.opacity));
-        draw(copy);
-    }
-}
 struct DrawItem {
     Packet packet;
     float opacity{};
     std::uint32_t sourceIndex{};
 };
+inline constexpr std::size_t MaxDrawPackets = 8192;
+inline constexpr std::size_t SmallDrawBatch = 128;
+// Validated against build 14181 scenesystem+0x70520 and +0x363B0.
+// Counts are independent: overflowing does not replace or extend fixed storage.
+inline constexpr std::size_t MaxGeneratedPrimitives = 1u << 20;
+struct PrimitiveBuffer {
+    std::uintptr_t fixed{};
+    std::int32_t capacity{}, count{}, overflowCount{}, reserved{};
+    std::uintptr_t overflow{};
+    std::int32_t overflowCapacity{}, allocationFlags{};
+};
+static_assert(sizeof(PrimitiveBuffer) == 0x28 && offsetof(PrimitiveBuffer, count) == 0xc &&
+              offsetof(PrimitiveBuffer, overflow) == 0x18);
+inline bool ValidPrimitiveBuffer(const PrimitiveBuffer &b) noexcept {
+    return b.count >= 0 && b.overflowCount >= 0 && b.capacity >= b.count && b.overflowCapacity >= b.overflowCount &&
+           std::uint64_t(b.count) + b.overflowCount <= MaxGeneratedPrimitives && (!b.count || b.fixed) &&
+           (!b.overflowCount || b.overflow);
+}
+inline bool ReadPrimitiveBuffer(const Memory &memory, std::uintptr_t address, PrimitiveBuffer &out) noexcept {
+    return memory.Read(address, out) && ValidPrimitiveBuffer(out);
+}
+// Read the current buffer after the original generator: its overflow allocation
+// may have moved. Never reuse an old pointer, visit old packets, or write counts.
+template <class Visit>
+bool ForEachAppended(const PrimitiveBuffer &before, const PrimitiveBuffer &after, Visit &&visit) {
+    if (!ValidPrimitiveBuffer(before) || !ValidPrimitiveBuffer(after) || before.count > after.count ||
+        before.overflowCount > after.overflowCount || (before.count && before.fixed != after.fixed))
+        return false;
+    const auto added = after.count - before.count + after.overflowCount - before.overflowCount;
+    const auto addressFits = [](std::uintptr_t base, std::int32_t count) {
+        return base <= (std::numeric_limits<std::uintptr_t>::max)() - sizeof(Packet) * static_cast<std::size_t>(count);
+    };
+    if (added > 512 || !addressFits(after.fixed, after.count) || !addressFits(after.overflow, after.overflowCount))
+        return false;
+    for (auto i = before.count; i < after.count; ++i)
+        visit(after.fixed + sizeof(Packet) * static_cast<std::size_t>(i));
+    for (auto i = before.overflowCount; i < after.overflowCount; ++i)
+        visit(after.overflow + sizeof(Packet) * static_cast<std::size_t>(i));
+    return true;
+}
+// Only engine-owned primitive memory from the active callback is passed here.
+// SEH contains concurrent teardown without propagating into an engine worker.
+inline bool WritePrimitive(std::uintptr_t address, const Packet &packet) noexcept {
+    __try {
+        std::memcpy(reinterpret_cast<void *>(address), &packet, sizeof(packet));
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+}
 class DrawBuffer {
-    std::array<DrawItem, 128> local_;
+    std::array<DrawItem, SmallDrawBatch> local_;
     std::vector<DrawItem> overflow_;
     std::size_t count_{};
 
   public:
-    void Push(const Packet &packet, float opacity, std::uint32_t sourceIndex = 0) {
+    void Clear() noexcept {
+        count_ = 0;
+        overflow_.clear();
+    }
+    bool Push(const Packet &packet, float opacity, std::uint32_t sourceIndex = 0) {
+        if (count_ >= MaxDrawPackets)
+            return false;
         if (count_ < local_.size())
             local_[count_] = {packet, opacity, sourceIndex};
         else {
@@ -185,40 +224,86 @@ class DrawBuffer {
             overflow_.push_back({packet, opacity, sourceIndex});
         }
         ++count_;
+        return true;
     }
     std::span<const DrawItem> Items() const noexcept {
         return {overflow_.empty() ? local_.data() : overflow_.data(), count_};
     }
 };
-// Submit whole color layers, not hidden/original/visible for each mesh piece.
-// The original batch is submitted exactly once, in its original order.
-template <class Draw, class Original>
-void DrawBatch(std::span<const DrawItem> items, const EffectsConfiguration &config, std::uintptr_t visibleMaterial,
-               std::uintptr_t hiddenMaterial, Draw &&draw, Original &&original) {
-    std::array<Packet, 128> packets;
-    const auto layer = [&](Color color, std::uintptr_t material) {
-        if (color.a <= 0)
-            return;
-        std::size_t count{};
-        for (const auto &item : items) {
-            if (item.opacity <= 0)
+// Scratch belongs to the hook owner, not thread-local storage: cached allocations
+// are released only after callbacks have drained, before the DLL is unloaded.
+class DrawScratch {
+    std::array<Packet, SmallDrawBatch> local_;
+    std::vector<Packet> large_;
+
+  public:
+    DrawBuffer selected;
+    std::span<Packet> Batch(std::size_t count) {
+        if (!count || count > MaxDrawPackets)
+            return {};
+        if (count <= local_.size())
+            return {local_.data(), count};
+        if (count > large_.capacity()) {
+            std::size_t capacity = SmallDrawBatch * 2;
+            while (capacity < count)
+                capacity *= 2;
+            large_.reserve(capacity);
+        }
+        large_.resize(count);
+        return large_;
+    }
+};
+template <std::size_t Slots = 8> class ScratchPool {
+    struct Slot {
+        std::atomic_bool busy{};
+        std::unique_ptr<DrawScratch> data;
+    };
+    std::array<Slot, Slots> slots_;
+
+  public:
+    class Lease {
+        Slot *slot_{};
+        friend class ScratchPool;
+        explicit Lease(Slot *slot) noexcept : slot_(slot) {}
+
+      public:
+        Lease() = default;
+        Lease(const Lease &) = delete;
+        Lease &operator=(const Lease &) = delete;
+        Lease(Lease &&other) noexcept : slot_(std::exchange(other.slot_, nullptr)) {}
+        ~Lease() {
+            if (slot_)
+                slot_->busy.store(false, std::memory_order_release);
+        }
+        explicit operator bool() const noexcept { return slot_ != nullptr; }
+        DrawScratch *operator->() noexcept { return slot_->data.get(); }
+    };
+    Lease Acquire() noexcept {
+        for (auto &slot : slots_) {
+            bool expected{};
+            if (!slot.busy.compare_exchange_strong(expected, true, std::memory_order_acquire))
                 continue;
-            auto &packet = packets[count++];
-            packet = item.packet;
-            packet.Set(offsets::PacketMaterial, material);
-            packet.Set(offsets::PacketColor, PackColor(color, item.opacity));
-            if (count == packets.size()) {
-                draw(std::span<const Packet>{packets.data(), count});
-                count = 0;
+            try {
+                if (!slot.data)
+                    slot.data = std::make_unique<DrawScratch>();
+                slot.data->selected.Clear();
+                return Lease(&slot);
+            } catch (...) {
+                slot.busy.store(false, std::memory_order_release);
+                return {};
             }
         }
-        if (count)
-            draw(std::span<const Packet>{packets.data(), count});
-    };
-    layer(config.visibility == EffectVisibility::TwoColor ? config.glowColor : config.materialColor, hiddenMaterial);
-    original();
-    if (config.visibility == EffectVisibility::TwoColor)
-        layer(config.materialColor, visibleMaterial);
+        // Busy render workers must never wait for an overlay buffer.
+        return {};
+    }
+    // Call only after the hook has been disabled and all callbacks have drained.
+    void Clear() noexcept {
+        for (auto &slot : slots_)
+            slot.data.reset();
+    }
+};
+inline bool HasVisibleTint(const EffectsConfiguration &config) noexcept {
+    return config.materialEnabled && config.visibility != EffectVisibility::OccludedOnly && config.materialColor.a > 0;
 }
 inline bool CanCompose(std::span<const DrawItem> items, const EffectsConfiguration &config, bool shaded) noexcept {
     if (config.visibility == EffectVisibility::OccludedOnly || shaded)
@@ -229,7 +314,7 @@ inline bool CanCompose(std::span<const DrawItem> items, const EffectsConfigurati
 inline Packet VisiblePacket(const Packet &original, float opacity, const EffectsConfiguration &config,
                             std::uintptr_t material, bool shaded) noexcept {
     auto copy = original;
-    if (config.visibility == EffectVisibility::OccludedOnly)
+    if (!HasVisibleTint(config) || !std::isfinite(opacity) || opacity <= 0 || (!shaded && !material))
         return copy;
     if (shaded) {
         auto rgba = copy.Get<std::array<std::uint8_t, 4>>(offsets::PacketColor);
@@ -244,5 +329,42 @@ inline Packet VisiblePacket(const Packet &original, float opacity, const Effects
         copy.Set(offsets::PacketColor, PackColor(config.materialColor, opacity));
     }
     return copy;
+}
+// The input is an owned copy of the complete engine batch. Validate all indices
+// before changing any packet, then retain its exact count, order and opaque data.
+inline bool ComposeVisible(std::span<Packet> batch, std::span<const DrawItem> selected,
+                           const EffectsConfiguration &config, std::uintptr_t material, bool shaded) noexcept {
+    if (batch.empty() || batch.size() > MaxDrawPackets || !HasVisibleTint(config) || (!shaded && !material))
+        return false;
+    for (const auto &item : selected)
+        if (item.sourceIndex >= batch.size() || !std::isfinite(item.opacity))
+            return false;
+    for (const auto &item : selected)
+        batch[item.sourceIndex] = VisiblePacket(item.packet, item.opacity, config, material, shaded);
+    return true;
+}
+// Only a depth-tested visible layer is submitted. No unverified Z-disabled
+// material or primitive-buffer header is changed to approximate hidden faces.
+template <class Draw>
+unsigned DrawVisible(std::span<const DrawItem> selected, const EffectsConfiguration &config, std::uintptr_t material,
+                     std::span<Packet> scratch, Draw &&draw) {
+    if (!HasVisibleTint(config) || !material || scratch.empty())
+        return 0;
+    scratch = scratch.first(std::min(scratch.size(), SmallDrawBatch));
+    std::size_t used{};
+    unsigned submitted{};
+    for (const auto &item : selected) {
+        if (!std::isfinite(item.opacity) || item.opacity <= 0 || !(PackColor(config.materialColor, item.opacity) >> 24))
+            continue;
+        scratch[used++] = VisiblePacket(item.packet, item.opacity, config, material, false);
+        ++submitted;
+        if (used == scratch.size()) {
+            draw(std::span<const Packet>{scratch.data(), used});
+            used = 0;
+        }
+    }
+    if (used)
+        draw(std::span<const Packet>{scratch.data(), used});
+    return submitted;
 }
 } // namespace awareness::cs2::model

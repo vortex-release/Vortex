@@ -37,6 +37,7 @@ class Source {
     ProjectileTracker projectiles_;
     WorldReader world_;
     DroppedReader dropped_;
+    FootstepReader footsteps_;
     std::unique_ptr<combat::GhostHistory> replayHistory_{std::make_unique<combat::GhostHistory>()};
 
   public:
@@ -49,6 +50,7 @@ class Source {
         projectiles_.Reset();
         world_.Reset();
         dropped_.Reset();
+        footsteps_.Reset();
         ClearGhosts();
         sampleMemory_.Reset();
         discovered_ = false;
@@ -70,7 +72,7 @@ class Source {
         return memory.Read(globals_.entitySlot, list) && projectiles_.Update(memory, list, FrameSeconds(), out);
     }
     bool ReadWorld(float gameTime, combat::WorldSnapshot &out, const combat::InfernoEvents &events = {}) noexcept {
-        out = {};
+        out.Clear();
         if (!status_.ready || !status_.buildVerified || status_.gameBuild != offsets::ExpectedBuild)
             return false;
         Memory m{&sampleMemory_, LocalMemory::Read};
@@ -104,6 +106,17 @@ class Source {
                            FullHandle(m, target, after) && after == motion.handle;
         }
     }
+    void ReadFootsteps(const FrameSnapshot &frame, worldvisuals::Footsteps &out, std::uint64_t &count) noexcept {
+        Memory m{&sampleMemory_, LocalMemory::Read};
+        std::uintptr_t list{};
+        if (status_.ready && status_.buildVerified && m.Read(globals_.entitySlot, list))
+            footsteps_.Update(m, list, frame, FrameSeconds());
+        else
+            footsteps_.Reset();
+        out = footsteps_.Events();
+        count = footsteps_.Count();
+    }
+    void ClearFootsteps() noexcept { footsteps_.Reset(); }
     bool ReadDropped(worldvisuals::Drops &out) noexcept {
         out = {};
         if (!status_.ready || !status_.buildVerified)

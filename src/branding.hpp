@@ -5,14 +5,12 @@
 #include <string_view>
 namespace vortex::brand {
 inline void Mark(ImDrawList *draw, ImVec2 center, float size, ImU32 color, ImU32 accent) {
-    const ImVec2 left[]{{center.x - size * .43f, center.y - size * .34f},
-                        {center.x - size * .18f, center.y - size * .34f},
-                        {center.x + size * .06f, center.y + size * .12f},
-                        {center.x - size * .07f, center.y + size * .39f}};
-    const ImVec2 right[]{{center.x + size * .02f, center.y - size * .34f},
-                         {center.x + size * .43f, center.y - size * .34f},
-                         {center.x + size * .05f, center.y + size * .39f},
-                         {center.x - size * .07f, center.y + size * .15f}};
+    // The two facets share one 32-unit grid; this is also the installer/app mark.
+    const auto at = [&](float x, float y) {
+        return ImVec2{center.x + (x - 16) * size / 32.f, center.y + (y - 16) * size / 32.f};
+    };
+    const ImVec2 left[]{at(3, 5), at(10, 5), at(16, 19), at(12.5f, 27)};
+    const ImVec2 right[]{at(22, 5), at(29, 5), at(18, 27), at(12.5f, 27)};
     draw->AddConvexPolyFilled(left, 4, color);
     draw->AddConvexPolyFilled(right, 4, accent);
 }

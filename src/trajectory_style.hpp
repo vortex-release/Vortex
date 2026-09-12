@@ -2,15 +2,15 @@
 #include <awareness/Trajectories.hpp>
 namespace awareness::flight {
 struct PathStyle {
-    std::uint32_t trailGlow{1}, shotGlow{1}, previewGlow{};
-    float trailStrength{2.f}, shotStrength{2.4f}, previewStrength{1.f};
-    float shotLifetime{.75f};
-    float trailWidth{2.4f}, shotWidth{2.2f}, previewWidth{1.6f};
+    std::uint32_t trailGlow{}, shotGlow{}, previewGlow{};
+    float trailStrength{.35f}, shotStrength{.35f}, previewStrength{.3f};
+    float shotLifetime{.5f};
+    float trailWidth{1.35f}, shotWidth{1.15f}, previewWidth{1.35f};
     Color trailHE{Tint(Utility::HE)}, trailSmoke{Tint(Utility::Smoke)}, trailFlash{Tint(Utility::Flash)},
         trailFire{Tint(Utility::Fire)}, trailDecoy{Tint(Utility::Decoy)};
     Color previewHE{trailHE}, previewSmoke{trailSmoke}, previewFlash{trailFlash}, previewFire{trailFire},
         previewDecoy{trailDecoy};
-    Color shotStart{1.f, .75f, .12f, 1}, shotEnd{1, 1, 1, 1}, shotCore{1, 1, 1, 1};
+    Color shotStart{.62f, .46f, 1, 1}, shotEnd{1, 1, 1, 1}, shotCore{1, 1, 1, 1};
     Color UtilityColor(Utility type, bool preview) const noexcept {
         switch (type) {
         case Utility::HE:

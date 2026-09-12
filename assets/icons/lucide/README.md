@@ -1,0 +1,1 @@
+Lucide 0.468.0 official icons, pinned to https://github.com/lucide-icons/lucide/tree/0.468.0/icons. ISC license in LICENSE. Rebuild compiled vector paths with `python scripts/generate-icons.py`. No font, SVG parser, network access, or image texture is used at runtime. Curves are flattened offline.

@@ -2,8 +2,11 @@
 #include "settings.hpp"
 #include "menu_probe.hpp"
 #include "menu_motion.hpp"
+#include "ui_icons.hpp"
+#include "branding.hpp"
 #include <imgui.h>
 #include <cmath>
+#include <cstring>
 namespace studio {
 inline ImVec4 Canvas{.065f, .065f, .078f, 1}, Panel{.085f, .085f, .10f, 1};
 inline ImVec4 Border{1, 1, 1, .075f}, Text{.95f, .95f, .98f, 1}, Muted{.57f, .57f, .64f, 1};
@@ -26,13 +29,13 @@ inline void Apply(const awareness::VisualOptions &v) {
     auto &s = ImGui::GetStyle();
     s = ImGuiStyle{};
     ImGui::StyleColorsDark();
-    s.WindowPadding = {20, 20};
+    s.WindowPadding = {16, 16};
     s.FramePadding = {9, 5};
-    s.ItemSpacing = {12, 9};
+    s.ItemSpacing = {10, 7};
     s.ItemInnerSpacing = {8, 6};
     s.CellPadding = {4, 5};
-    s.WindowRounding = 14;
-    s.ChildRounding = 12;
+    s.WindowRounding = 12;
+    s.ChildRounding = 9;
     s.FrameRounding = 7;
     s.PopupRounding = 6;
     s.GrabRounding = 6;
@@ -123,11 +126,15 @@ inline void Card(const char *title, const char *description = nullptr) {
     ImGui::TextUnformatted(title);
     ImGui::PopFont();
     if (description && *description) {
-        ImGui::PushStyleColor(ImGuiCol_Text, Muted);
-        ImGui::TextWrapped("%s", description);
-        ImGui::PopStyleColor();
+        ImGui::SameLine();
+        const auto at = ImGui::GetCursorScreenPos();
+        const float size = 15 * ImGui::GetStyle().FontScaleMain;
+        ImGui::InvisibleButton("About", {size, size}, ImGuiButtonFlags_EnableNav);
+        vortex::icons::Draw(ImGui::GetWindowDrawList(), vortex::icons::Id::CircleHelp, at, size, Packed(Muted));
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal) || ImGui::IsItemFocused())
+            ImGui::SetTooltip("%s", description);
     }
-    ImGui::Dummy({0, 6 * ImGui::GetStyle().FontScaleMain});
+    ImGui::Dummy({0, 3 * ImGui::GetStyle().FontScaleMain});
 }
 inline void EndCard() {
     ImGui::EndChild();
@@ -170,7 +177,7 @@ inline bool Toggle(const char *label, std::uint32_t &value) {
 inline bool Nav(const char *label, int icon, bool selected) {
     const float s = ImGui::GetStyle().FontScaleMain;
     const auto p = ImGui::GetCursorScreenPos();
-    const ImVec2 size{ImGui::GetContentRegionAvail().x, 43 * s};
+    const ImVec2 size{ImGui::GetContentRegionAvail().x, 39 * s};
     const bool clicked = ImGui::InvisibleButton(label, size, ImGuiButtonFlags_EnableNav);
     awareness::testing::Record(label);
     auto *d = ImGui::GetWindowDrawList();
@@ -182,51 +189,45 @@ inline bool Nav(const char *label, int icon, bool selected) {
     if (t > .001f)
         d->AddRectFilled(p, {p.x + size.x, p.y + size.y}, Packed(Alpha(Accent, .13f * t)), 7 * s);
     if (selected)
-        d->AddRectFilled({p.x, p.y + 11 * s}, {p.x + 2 * s, p.y + 28 * s}, Packed(Accent), s);
+        d->AddRectFilled({p.x, p.y + 11 * s}, {p.x + 2 * s, p.y + 27 * s}, Packed(Accent), s);
     Interaction();
     const auto color = Packed(selected ? Accent : Muted);
-    const ImVec2 q{p.x + 21 * s, p.y + 19 * s};
-    if (icon == 0) {
-        d->AddCircle({q.x, q.y - 4 * s}, 3 * s, color, 16, 1.4f * s);
-        d->AddRect({q.x - 5 * s, q.y + 1 * s}, {q.x + 5 * s, q.y + 7 * s}, color, 2 * s);
-    } else if (icon == 1) {
-        d->AddCircle(q, 6 * s, color, 24, 1.4f * s);
-        d->AddLine({q.x - 10 * s, q.y}, {q.x - 3 * s, q.y}, color);
-        d->AddLine({q.x, q.y - 10 * s}, {q.x, q.y - 3 * s}, color);
-    } else if (icon == 2) {
-        d->AddCircle(q, 6 * s, color, 24, 1.4f * s);
-        d->AddCircleFilled({q.x + 2 * s, q.y - 2 * s}, 2 * s, color);
-    } else if (icon == 4) {
-        d->AddCircle(q, 7 * s, color, 24, 1.3f * s);
-        d->AddEllipse(q, {3 * s, 7 * s}, color, 0, 24, 1.1f * s);
-        d->AddLine({q.x - 7 * s, q.y}, {q.x + 7 * s, q.y}, color);
-    } else if (icon == 5) {
-        for (int x : {-1, 1})
-            for (int y : {-1, 1})
-                d->AddLine({q.x + x * 3 * s, q.y + y * 3 * s}, {q.x + x * 7 * s, q.y + y * 7 * s}, color, 1.4f * s);
-    } else if (icon == 6) {
-        for (int i = 0; i < 2; ++i) {
-            float x = q.x + (i * 7 - 5) * s;
-            d->AddLine({x - 3 * s, q.y - 5 * s}, {x + 2 * s, q.y}, color, 1.4f * s);
-            d->AddLine({x + 2 * s, q.y}, {x - 3 * s, q.y + 5 * s}, color, 1.4f * s);
-        }
-    } else if (icon == 7) {
-        d->AddLine({q.x, q.y - 7 * s}, {q.x, q.y + 7 * s}, color, 1.4f * s);
-        d->AddLine({q.x - 4 * s, q.y + 2 * s}, {q.x, q.y + 7 * s}, color, 1.4f * s);
-        d->AddLine({q.x + 4 * s, q.y + 2 * s}, {q.x, q.y + 7 * s}, color, 1.4f * s);
-        d->AddLine({q.x - 7 * s, q.y - 6 * s}, {q.x + 7 * s, q.y - 6 * s}, color, 1.4f * s);
-    } else {
-        d->AddLine({q.x - 7 * s, q.y - 4 * s}, {q.x + 7 * s, q.y - 4 * s}, color, 1.4f * s);
-        d->AddLine({q.x - 7 * s, q.y + 4 * s}, {q.x + 7 * s, q.y + 4 * s}, color, 1.4f * s);
-        d->AddCircleFilled({q.x - 3 * s, q.y - 4 * s}, 2.5f * s, color);
-        d->AddCircleFilled({q.x + 3 * s, q.y + 4 * s}, 2.5f * s, color);
-    }
-    d->AddText({p.x + 40 * s, p.y + 13 * s}, Packed(selected ? Text : Muted), label);
+    constexpr vortex::icons::Id family[]{vortex::icons::Id::UserRound,       vortex::icons::Id::Crosshair,
+                                         vortex::icons::Id::LayoutDashboard, vortex::icons::Id::SlidersHorizontal,
+                                         vortex::icons::Id::Globe,           vortex::icons::Id::ScanLine,
+                                         vortex::icons::Id::Route,           vortex::icons::Id::Download};
+    vortex::icons::Draw(d, family[std::clamp(icon, 0, 7)], {p.x + 12 * s, p.y + 10 * s}, 19 * s, color);
+    d->AddText({p.x + 40 * s, p.y + 11 * s}, Packed(selected ? Text : Muted), label);
     return clicked;
 }
-inline bool Tab(const char *label) {
-    const bool open = ImGui::BeginTabItem(label);
+inline const char *RequestedTab{};
+inline void Tip(const char *description) {
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal | ImGuiHoveredFlags_AllowWhenDisabled))
+        ImGui::SetTooltip("%s", description);
+}
+inline bool IconButton(const char *label, vortex::icons::Id icon, float size = 28.f) {
+    const float s = ImGui::GetStyle().FontScaleMain;
+    const auto at = ImGui::GetCursorScreenPos();
+    const bool pressed = ImGui::InvisibleButton(label, {size * s, size * s}, ImGuiButtonFlags_EnableNav);
     awareness::testing::Record(label);
+    const float t = Animate(ImGui::GetItemID(), ImGui::IsItemHovered() ? 1.f : 0.f);
+    auto *d = ImGui::GetWindowDrawList();
+    if (t > .001f)
+        d->AddRectFilled(at, {at.x + size * s, at.y + size * s}, Packed({1, 1, 1, .07f * t}), 6 * s);
+    vortex::icons::Draw(d, icon, {at.x + (size - 18) * .5f * s, at.y + (size - 18) * .5f * s}, 18 * s, Packed(Text));
+    Interaction();
+    Tip(label);
+    return pressed;
+}
+inline bool Tab(const char *label) {
+    const bool requested = RequestedTab && std::strcmp(RequestedTab, label) == 0;
+    const bool open =
+        ImGui::BeginTabItem(label, nullptr, requested ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None);
+    if (requested)
+        RequestedTab = nullptr;
+    awareness::testing::Record(label);
+    if (std::strcmp(label, "Post-processing") == 0)
+        awareness::testing::Record("Scene");
     return open;
 }
 } // namespace studio

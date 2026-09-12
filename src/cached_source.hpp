@@ -11,7 +11,8 @@ class CachedSource {
     struct Request {
         TargetBone bone{TargetBone::Head};
         bool badge{};
-        bool preview{}, projectiles{}, world{}, ghosts{}, kills{}, models{}, spectators{}, dropped{}, velocities{};
+        bool preview{}, projectiles{}, world{}, ghosts{}, kills{}, models{}, spectators{}, dropped{}, velocities{},
+            footsteps{};
         float gameTime{}, ghostDuration{.18f};
         Configuration config;
         styling::Sky sky;
@@ -28,6 +29,8 @@ class CachedSource {
         SpectatorFrame spectators;
         tracking::Sample tracking;
         worldvisuals::Drops dropped;
+        worldvisuals::Footsteps footsteps;
+        std::uint64_t footstepCount{};
         KillSample kills;
         model::Targets targets;
         ULONGLONG sampledAt{};
@@ -60,7 +63,7 @@ class CachedSource {
                 if (generation_ != generation) {
                     source_.Rescan();
                     generation_ = generation;
-                    out = {};
+                    ResetInPlace(out);
                     nextPing_ = 0;
                     ping_ = -1;
                     nextSpectators_ = 0;
@@ -91,8 +94,10 @@ class CachedSource {
                 out.preview = {};
                 out.tracking = {};
                 out.dropped = {};
+                out.footsteps.Clear();
+                out.footstepCount = 0;
                 out.projectiles = {};
-                out.world = {};
+                out.world.Clear();
                 out.spectators = {};
                 out.killReady = false;
                 out.targets.count = 0;
@@ -108,6 +113,10 @@ class CachedSource {
                         nextPing_ = 0;
                     }
                     source_.ReadTracking(out.frame, out.tracking, request.velocities);
+                    if (request.footsteps)
+                        source_.ReadFootsteps(out.frame, out.footsteps, out.footstepCount);
+                    else
+                        source_.ClearFootsteps();
                     if (request.dropped) {
                         if (start >= nextDrops_) {
                             source_.ReadDropped(dropped_);
@@ -154,6 +163,7 @@ class CachedSource {
                     nextPing_ = 0;
                     out.ghosts.Clear();
                     source_.ClearGhosts();
+                    source_.ClearFootsteps();
                     dropped_ = {};
                     nextDrops_ = 0;
                     spectators_ = {};
@@ -164,6 +174,7 @@ class CachedSource {
             [this] {
                 ClearSky();
                 source_.ClearGhosts();
+                source_.ClearFootsteps();
             });
     }
     ~CachedSource() {
@@ -178,19 +189,19 @@ class CachedSource {
         request_.config = c;
         request_.preview = preview;
         request_.projectiles = c.enabled && v.grenadeTrails;
-        request_.world = c.enabled && (v.combat.bombTimer || v.combat.areas);
+        request_.world = c.enabled && (v.combat.bombTimer || v.combat.areas || v.combat.utilityTimers);
         request_.ghosts = c.enabled && v.combat.ghosts;
         request_.ghostDuration = v.combat.ghostDuration;
         request_.kills = v.killSoundEnabled;
         request_.dropped = c.enabled && v.worldVisuals.dropped;
+        request_.footsteps = c.enabled && v.worldVisuals.footsteps;
         request_.velocities = v.trackingProfiles.compensation;
         request_.spectators = c.enabled && v.spectators;
         request_.models = c.enabled && (e.materialEnabled || e.glowEnabled);
     }
     bool Update(FrameSnapshot &frame, TargetBone bone = TargetBone::Head) {
         request_.bone = bone;
-        worker_.Configure(request_);
-        worker_.CopyIfNew(current_, publicationSerial_);
+        worker_.TryExchange(request_, current_, publicationSerial_);
         frame = current_.frame;
         // A current camera matrix is essential: reusing a 15ms-old projection
         // would make otherwise cached world positions swim during mouse movement.
@@ -210,7 +221,7 @@ class CachedSource {
         ClearSky();
         ClearHighlight();
         worker_.Invalidate();
-        current_ = {};
+        ResetInPlace(current_);
     }
     assist::Addresses AssistAddresses() const {
         if (!current_.valid || !current_.status.buildVerified)
@@ -227,6 +238,8 @@ class CachedSource {
     int Ping() const { return current_.ping; }
     const tracking::Sample &Tracking() const { return current_.tracking; }
     const worldvisuals::Drops &Dropped() const { return current_.dropped; }
+    const worldvisuals::Footsteps &Footsteps() const { return current_.footsteps; }
+    auto FootstepCount() const { return current_.footstepCount; }
     bool TrackingWeaponCurrent() const {
         LocalMemory local;
         Memory m{&local, LocalMemory::Read};

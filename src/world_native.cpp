@@ -11,6 +11,7 @@ namespace awareness::cs2 {
 namespace {
 namespace abi = trajectory_offsets;
 using Draw = void (*)(void *, void *, const model::Packet *, int, void *, void *, void *);
+using Generate = std::uintptr_t (*)(void *, void *, void *, void *);
 struct Selection {
     combat::Options settings;
     combat::WorldSnapshot world;
@@ -18,6 +19,9 @@ struct Selection {
 struct State {
     std::uintptr_t scene{}, particles{};
     Draw particle{};
+    Generate worldGenerate{};
+    bool worldInstalled{};
+    std::atomic<std::uint64_t> worldGains{};
     bool particleInstalled{};
     std::atomic<unsigned> inFlight{};
     std::atomic<ULONGLONG> deadline{};
@@ -108,7 +112,36 @@ void ParticleHook(void *self, void *ctx, const model::Packet *packets, int count
         forward();
     }
 }
-bool Install(void *at, void *hook, Draw &original) noexcept {
+// World tint belongs before instance-data upload, not in the late draw callback.
+std::uintptr_t WorldHook(void *self, void *object, void *view, void *output) {
+    Guard guard;
+    const auto gains = state.worldGains.load(std::memory_order_relaxed);
+    if (!gains || GetTickCount64() > state.deadline)
+        return state.worldGenerate(self, object, view, output);
+    LocalMemory local;
+    Memory m{&local, LocalMemory::Read};
+    std::uintptr_t pass{};
+    std::uint32_t token{};
+    model::PrimitiveBuffer before{}, after{};
+    const auto buffer = reinterpret_cast<std::uintptr_t>(output);
+    if (!m.Field(reinterpret_cast<std::uintptr_t>(view), 0x10, pass) || !m.Field(pass, offsets::ViewPass, token) ||
+        token != model::PassToken("CsgoForward") || !model::ReadPrimitiveBuffer(m, buffer, before))
+        return state.worldGenerate(self, object, view, output);
+    const auto result = state.worldGenerate(self, object, view, output);
+    local.Reset();
+    if (model::ReadPrimitiveBuffer(m, buffer, after))
+        model::ForEachAppended(before, after, [&](std::uintptr_t address) {
+            model::Packet packet;
+            if (m.Read(address, packet) &&
+                packet.Get<std::uintptr_t>(offsets::PacketSceneObject) == reinterpret_cast<std::uintptr_t>(object)) {
+                packet.Set(offsets::PacketColor,
+                           scene::Tint(packet.Get<std::array<std::uint8_t, 4>>(offsets::PacketColor), gains));
+                model::WritePrimitive(address, packet);
+            }
+        });
+    return result;
+}
+template <class Function> bool Install(void *at, void *hook, Function &original) noexcept {
     if (MH_CreateHook(at, hook, reinterpret_cast<void **>(&original)) != MH_OK)
         return false;
     if (MH_EnableHook(at) == MH_OK)
@@ -118,7 +151,7 @@ bool Install(void *at, void *hook, Draw &original) noexcept {
 }
 } // namespace
 HRESULT StartWorldEffects() noexcept {
-    if (state.particleInstalled)
+    if (state.particleInstalled || state.worldInstalled)
         return S_OK;
     state.scene = reinterpret_cast<std::uintptr_t>(GetModuleHandleW(L"scenesystem.dll"));
     state.particles = reinterpret_cast<std::uintptr_t>(GetModuleHandleW(L"particles.dll"));
@@ -126,13 +159,30 @@ HRESULT StartWorldEffects() noexcept {
                abi::ParticleDrawBytes))
         state.particleInstalled = Install(reinterpret_cast<void *>(state.particles + abi::ParticleDraw),
                                           reinterpret_cast<void *>(ParticleHook), state.particle);
+    LocalMemory local;
+    const Memory memory{&local, LocalMemory::Read};
+    std::uintptr_t worldEntry{};
+    if (Verify(state.scene, offsets::SceneTimestamp, offsets::SceneImageSize, abi::WorldGenerate,
+               abi::WorldGenerateBytes) &&
+        memory.Field(state.scene, 0x5d8320, worldEntry) && worldEntry == state.scene + abi::WorldGenerate)
+        state.worldInstalled = Install(reinterpret_cast<void *>(state.scene + abi::WorldGenerate),
+                                       reinterpret_cast<void *>(WorldHook), state.worldGenerate);
+    OverlayLog(state.worldInstalled ? "Native world material tint connected."
+                                    : "Native world material tint unavailable.");
     OverlayLog(state.particleInstalled ? "Particle replacement connected."
                                        : "Particle replacement layout unavailable.");
-    return state.particleInstalled ? S_OK : S_FALSE;
+    return state.particleInstalled || state.worldInstalled ? S_OK : S_FALSE;
 }
-void ConfigureWorldEffects(const combat::Options &s, const combat::WorldSnapshot &world, bool ready) noexcept {
-    if (!ready || !(s.areas && s.hideParticles)) {
+void ConfigureWorldEffects(const combat::Options &s, const combat::WorldSnapshot &world,
+                           const scene::Options &sceneStyle, bool ready) noexcept {
+    state.worldGains = ready ? scene::Gains(sceneStyle) : 0;
+    if (!ready) {
         PauseWorldEffects();
+        return;
+    }
+    state.deadline = GetTickCount64() + 250;
+    if (!(s.areas && s.hideParticles)) {
+        state.selection = nullptr;
         return;
     }
     try {
@@ -166,7 +216,8 @@ HRESULT StopWorldEffects() noexcept {
         auto r = MH_DisableHook(reinterpret_cast<void *>(at));
         return r == MH_OK || r == MH_ERROR_DISABLED;
     };
-    if (!stop(state.particles + abi::ParticleDraw, state.particleInstalled))
+    if (!stop(state.particles + abi::ParticleDraw, state.particleInstalled) ||
+        !stop(state.scene + abi::WorldGenerate, state.worldInstalled))
         return E_FAIL;
     const auto until = GetTickCount64() + 5000;
     while (state.inFlight) {
@@ -174,10 +225,17 @@ HRESULT StopWorldEffects() noexcept {
             return HRESULT_FROM_WIN32(ERROR_BUSY);
         Sleep(1);
     }
-    if (state.particleInstalled &&
-        MH_RemoveHook(reinterpret_cast<void *>(state.particles + abi::ParticleDraw)) != MH_OK)
-        return E_FAIL;
-    state.particleInstalled = false;
+    if (state.particleInstalled) {
+        if (MH_RemoveHook(reinterpret_cast<void *>(state.particles + abi::ParticleDraw)) != MH_OK)
+            return E_FAIL;
+        state.particleInstalled = false;
+    }
+    if (state.worldInstalled) {
+        if (MH_RemoveHook(reinterpret_cast<void *>(state.scene + abi::WorldGenerate)) != MH_OK)
+            return E_FAIL;
+        state.worldInstalled = false;
+    }
+    state.worldGains = 0;
     state.selection = nullptr;
     for (auto &entry : state.pool)
         entry.reset();

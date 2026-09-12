@@ -28,17 +28,87 @@ inline bool ReadFootstep(const Memory &m, std::uintptr_t list, std::uintptr_t pa
     std::uint32_t after{};
     std::uint8_t life{}, team{}, dormant{};
     char name[64]{};
-    if (!EntityName(m, pawn, name) || std::strcmp(name, "cs_player_pawn") || !FullHandle(m, pawn, out.handle) ||
-        EntityAt(m, list, out.handle) != pawn || !m.Field(pawn, offsets::LifeState, life) || life ||
-        !m.Field(pawn, offsets::Team, team) || team < 2 || team > 3 || !m.Field(pawn, offsets::SceneNode, scene) ||
-        !m.Field(scene, offsets::Dormant, dormant) || dormant || !m.Field(scene, offsets::Origin, out.position) ||
-        !PlausiblePosition(out.position) || !FullHandle(m, pawn, after) || after != out.handle)
+    if (!EntityName(m, pawn, name) ||
+        (std::strcmp(name, "cs_player_pawn") && std::strcmp(name, "c_cs_player_for_precache")) ||
+        !FullHandle(m, pawn, out.handle) || EntityAt(m, list, out.handle) != pawn ||
+        !m.Field(pawn, offsets::LifeState, life) || life || !m.Field(pawn, offsets::Team, team) || team < 2 ||
+        team > 3 || !m.Field(pawn, offsets::SceneNode, scene) || !m.Field(scene, offsets::Dormant, dormant) ||
+        dormant || !m.Field(scene, offsets::Origin, out.position) || !PlausiblePosition(out.position) ||
+        !FullHandle(m, pawn, after) || after != out.handle)
         return false;
     out.team = team;
     out.time = now;
     out.position.z += 1.5f;
     return true;
 }
+// Observe the engine's alternating step phase, not a synthetic distance timer.
+// This supplements event dispatch when a client-side step is never broadcast.
+class FootstepReader {
+    struct Phase {
+        std::uint32_t handle{};
+        std::uintptr_t movement{};
+        int side{};
+        double time{};
+    };
+    std::array<Phase, MaxEntities> phases_{};
+    worldvisuals::Footsteps events_;
+    std::uintptr_t list_{};
+    std::uint64_t accepted_{};
+
+  public:
+    void Reset() noexcept {
+        phases_ = {};
+        events_.Clear();
+        list_ = 0;
+        accepted_ = 0;
+    }
+    const auto &Events() const noexcept { return events_; }
+    auto Count() const noexcept { return accepted_; }
+    void Update(const Memory &m, std::uintptr_t list, const FrameSnapshot &frame, double now) noexcept {
+        if (!list || !std::isfinite(now)) {
+            Reset();
+            return;
+        }
+        if (list != list_) {
+            Reset();
+            list_ = list;
+        }
+        for (unsigned i = 0; i < MaxEntities; ++i) {
+            auto &previous = phases_[i];
+            if (i >= frame.entityCount) {
+                previous = {};
+                continue;
+            }
+            const auto &entity = frame.entities[i];
+            if (!entity.valid || entity.dormant || entity.health <= 0) {
+                previous = {};
+                continue;
+            }
+            const auto pawn = EntityAt(m, list, entity.id);
+            std::uint32_t handle{}, after{}, flags{};
+            std::uintptr_t movement{};
+            Vector3 velocity{};
+            int side{};
+            if (!FullHandle(m, pawn, handle) || (handle & offsets::EntryMask) != entity.id ||
+                !m.Field(pawn, offsets::MovementServices, movement) || !movement ||
+                !m.Field(movement, offsets::MovementStepSide, side) || side < 0 || side > 1 ||
+                !m.Field(pawn, offsets::MovementFlags, flags) || !m.Field(pawn, offsets::AbsVelocity, velocity) ||
+                !Finite(velocity) || !FullHandle(m, pawn, after) || after != handle) {
+                previous = {};
+                continue;
+            }
+            const bool transition = previous.handle == handle && previous.movement == movement && now > previous.time &&
+                                    now - previous.time < .25 && previous.side != side;
+            previous = {handle, movement, side, now};
+            const float speed2 = velocity.x * velocity.x + velocity.y * velocity.y;
+            if (!transition || !(flags & 1) || speed2 < 1600 || speed2 > 1000000)
+                continue;
+            worldvisuals::Footstep sample;
+            if (ReadFootstep(m, list, pawn, now, sample) && sample.handle == handle && events_.Add(sample))
+                ++accepted_;
+        }
+    }
+};
 inline Vector3 RotateWeapon(Vector3 p, Vector3 angles) noexcept {
     constexpr float rad = .01745329252f;
     const float cy = std::cos(angles.y * rad), sy = std::sin(angles.y * rad);
@@ -59,7 +129,7 @@ inline bool ReadDroppedWeapon(const Memory &m, std::uintptr_t list, std::uint32_
     if (!FullHandle(m, entity, handle) || handle != expected || !m.Field(entity, offsets::EntityOwner, owner) ||
         (owner && owner != 0xffffffff) ||
         !m.Field(entity, offsets::AttributeManager + offsets::ItemView + offsets::ItemDefinition, id) ||
-        !FindWeaponIcon(id) || !m.Field(entity, offsets::SceneNode, scene) ||
+        !worldvisuals::DroppedName(id) || !m.Field(entity, offsets::SceneNode, scene) ||
         !m.Field(scene, offsets::Dormant, dormant) || dormant || !m.Field(scene, offsets::Origin, out.position) ||
         !PlausiblePosition(out.position))
         return false;
@@ -76,8 +146,16 @@ inline bool ReadDroppedWeapon(const Memory &m, std::uintptr_t list, std::uint32_
         }
         out.bounds = true;
     }
+    if (worldvisuals::DropCategory(id) < 5) {
+        int clip{};
+        if (m.Field(entity, offsets::Clip1, clip) && clip >= 0 && clip <= 250)
+            out.ammo = clip;
+    }
+    std::uint16_t definitionAfter{};
     if (!FullHandle(m, entity, after) || after != expected || !m.Field(entity, offsets::EntityOwner, after) ||
-        after != owner)
+        after != owner ||
+        !m.Field(entity, offsets::AttributeManager + offsets::ItemView + offsets::ItemDefinition, definitionAfter) ||
+        definitionAfter != id)
         return false;
     out.handle = expected;
     out.definition = id;
@@ -91,7 +169,7 @@ class DroppedReader {
     double previous_{};
 
   public:
-    void Reset() noexcept { *this = {}; }
+    void Reset() noexcept { ResetInPlace(*this); }
     bool Update(const Memory &m, std::uintptr_t list, double now, worldvisuals::Drops &out) noexcept {
         out = {};
         if (!list || !std::isfinite(now)) {
@@ -117,7 +195,7 @@ class DroppedReader {
             std::uint16_t id{};
             if (!FullHandle(m, entity, h) ||
                 !m.Field(entity, offsets::AttributeManager + offsets::ItemView + offsets::ItemDefinition, id) ||
-                !FindWeaponIcon(id))
+                !worldvisuals::DroppedName(id))
                 return;
             for (unsigned i = 0; i < count_; ++i)
                 if (handles_[i] == h)

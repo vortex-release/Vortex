@@ -1,9 +1,44 @@
 #include "snapshot_worker.hpp"
+#include "combat_reader.hpp"
 #include "recoil_input.hpp"
 #include "presets.hpp"
 #include <atomic>
 #include <cstdio>
 using namespace awareness;
+namespace {
+// Exceeds the usual 1 MB worker stack. Only the heap owns these publications;
+// the same operations must also run on a host thread with a 128 KB reservation.
+struct LargePublication {
+    std::array<std::byte, 1024 * 1024> storage{};
+    combat::WorldSnapshot world;
+    unsigned value{73};
+};
+struct LargeFixture {
+    SnapshotWorker<LargePublication, unsigned> worker;
+    LargePublication output;
+    cs2::WorldReader reader;
+    std::atomic_bool sampled{}, idled{};
+    bool narrowPassed{};
+};
+DWORD WINAPI NarrowStackReset(void *context) {
+    auto &fixture = *static_cast<LargeFixture *>(context);
+    fixture.output.storage.back() = std::byte{19};
+    fixture.output.world.areas[0].cellRadius = 1;
+    ResetInPlace(fixture.output);
+    const bool defaults = fixture.output.world.areas.back().cellRadius == 25 &&
+                          fixture.output.world.bomb.defuseLength == 10 &&
+                          fixture.output.storage.back() == std::byte{} && fixture.output.value == 73;
+    fixture.output.world.areaCount = 1;
+    fixture.reader.Reset();
+    cs2::Memory empty{};
+    const bool rejected = !fixture.reader.Update(empty, 0, 0, 0, 0, fixture.output.world);
+    const bool cleared = fixture.output.world.areaCount == 0 && !fixture.output.world.bomb.valid;
+    fixture.worker.Invalidate();
+    fixture.worker.Copy(fixture.output);
+    fixture.narrowPassed = defaults && rejected && cleared && fixture.output.value == 73;
+    return fixture.narrowPassed ? 0 : 1;
+}
+} // namespace
 int main() {
     int failures{};
     const auto check = [&](bool ok, const char *why) {
@@ -36,6 +71,29 @@ int main() {
     check(mouse.Apply({.22f, 0, 0}, 1, .022f, .022f, send) == S_OK && y == -10,
           "retry does not double failed correction");
     check(FAILED(mouse.Apply({1, 0, 0}, 0, .022f, .022f, send)), "invalid sensitivity cannot generate input");
+    {
+        Configuration c;
+        VisualOptions v;
+        EffectsConfiguration e;
+        v.assists.shoot = v.assists.jumper = v.assists.strafer = 1;
+        v.assists.shootKey = VK_XBUTTON2;
+        v.assists.shootMode = 2;
+        v.assists.preserveForward = 0;
+        v.assists.strafeStrength = .37f;
+        v.assists.delayMs = 83;
+        v.combat.recoilGroups = {0, 1, 0, 1, 1, 0};
+        v.combat.weapons[1].activation = 2;
+        v.combat.weapons[1].vertical = .44f;
+        const auto groups = v.combat.recoilGroups;
+        Harmonize(c, v, e);
+        check(v.assists.shoot && v.assists.jumper && v.assists.strafer && v.assists.shootKey == VK_XBUTTON2 &&
+                  v.assists.shootMode == 2 && !v.assists.preserveForward && v.assists.strafeStrength == .37f &&
+                  v.assists.delayMs == 83,
+              "palette-only action preserves assist activation, bindings and movement tuning");
+        check(v.combat.recoilGroups == groups && v.combat.weapons[1].activation == 2 &&
+                  v.combat.weapons[1].vertical == .44f,
+              "palette-only action preserves recoil eligibility and individual weapon tuning");
+    }
     for (auto kind : {Preset::Signature, Preset::Focus, Preset::Broadcast}) {
         Configuration c;
         VisualOptions v;
@@ -53,6 +111,12 @@ int main() {
         check(t.hotkey == VK_XBUTTON1 && c.worldUnitsPerMeter == 39.3700787f &&
                   !std::strcmp(v.killSoundPath, "personal.wav"),
               "personal bindings, sound and coordinate scale are preserved");
+        check(!v.combat.contrast && v.combat.worldDarkness == 0 && e.visibility == EffectVisibility::AlwaysVisible,
+              "presets use visible models without screen-wide grading");
+        check(v.paths.shotWidth <= 1.2f && v.paths.shotLifetime <= .5f && !v.paths.shotGlow && !v.paths.trailGlow,
+              "presets keep tracers thin and short without stacked glow");
+        check(v.combat.recoilGroups == std::array<std::uint32_t, 6>{0, 0, 1, 1, 0, 0},
+              "presets limit recoil eligibility to automatic rifle and SMG groups");
         if (kind == Preset::Focus)
             check(!e.materialEnabled && !e.glowEnabled && !v.paths.shotGlow, "focus removes expensive extras");
         if (kind == Preset::Broadcast)
@@ -145,6 +209,48 @@ int main() {
     check(expired.CopyIfNew(out, serial) && out.value == 0,
           "idle transition publishes an empty snapshot to serial-based readers");
     expired.Stop();
+    {
+        auto large = std::make_unique<LargeFixture>();
+        const HANDLE narrow = CreateThread(nullptr, 128 * 1024, NarrowStackReset, large.get(),
+                                           STACK_SIZE_PARAM_IS_A_RESERVATION, nullptr);
+        check(narrow != nullptr, "create a narrow host-stack regression thread");
+        if (narrow) {
+            // The thread only resets/copies bounded records; it has no external waits.
+            WaitForSingleObject(narrow, INFINITE);
+            DWORD exitCode{};
+            GetExitCodeThread(narrow, &exitCode);
+            check(exitCode == 0 && large->narrowPassed,
+                  "large records reset, invalidate and preserve defaults on a 128 KB host stack");
+            CloseHandle(narrow);
+        }
+        large->worker.Start(
+            [&](const unsigned &value, LargePublication &data, unsigned) {
+                ResetInPlace(data);
+                data.value = value;
+                data.storage.back() = std::byte{9};
+                large->sampled.store(true);
+            },
+            [&] { large->idled.store(true); });
+        large->worker.Configure(123);
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        while (!large->sampled.load() && std::chrono::steady_clock::now() < deadline)
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        for (;;) {
+            large->worker.Copy(large->output);
+            if (large->output.value == 123 || std::chrono::steady_clock::now() >= deadline)
+                break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        }
+        check(large->output.value == 123 && large->output.storage.back() == std::byte{9},
+              "default-stack worker publishes a record larger than its own stack");
+        while (!large->idled.load() && std::chrono::steady_clock::now() < deadline)
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        large->worker.Copy(large->output);
+        check(large->idled.load() && large->output.value == 73 && large->output.storage.back() == std::byte{} &&
+                  large->output.world.areas.back().cellRadius == 25,
+              "idle expiration resets oversized publications without losing nonzero defaults");
+        large->worker.Stop();
+    }
     std::printf("Runtime checks: %s\n", failures ? "FAILED" : "passed");
     return failures ? 1 : 0;
 }

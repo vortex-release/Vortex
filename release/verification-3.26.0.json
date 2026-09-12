@@ -1,0 +1,51 @@
+{
+  "version": "3.26.0",
+  "verifiedAtUtc": "2026-09-12T01:39:34.037516+00:00",
+  "build": "Release x64",
+  "offlineTests": {
+    "total": 49,
+    "passed": 49,
+    "failed": 0
+  },
+  "focusedChecks": {
+    "assists": 592,
+    "lineups": 62,
+    "worldFeatures": 1219,
+    "cameraVisuals": 101
+  },
+  "gameLaunched": false,
+  "gameInspected": false,
+  "liveGameplayVerified": false,
+  "publicReleasePushed": false,
+  "installedLocally": true,
+  "installer": "C:\\Users\\Joshu\\AppData\\Local\\Vortex\\releases\\3.26.0-candidate\\Vortex-3.26.0-Setup.exe",
+  "installerSha256": "6F73AA3CFE4945CE21D872294B98E2AEE451083A301E360C6EF347D4031FDFC7",
+  "dllSha256": {
+    "build": "2144C04B3E4E802E88047D3D72FB33956906674E888BED3ADB647ECE8AEA37E1",
+    "installed": "2144C04B3E4E802E88047D3D72FB33956906674E888BED3ADB647ECE8AEA37E1",
+    "desktop": "2144C04B3E4E802E88047D3D72FB33956906674E888BED3ADB647ECE8AEA37E1",
+    "legacy": "2144C04B3E4E802E88047D3D72FB33956906674E888BED3ADB647ECE8AEA37E1"
+  },
+  "paths": {
+    "build": "C:\\Users\\Joshu\\AppData\\Local\\Vortex\\Build\\Release\\EntityAwarenessOverlay.dll",
+    "installed": "C:\\Users\\Joshu\\AppData\\Local\\Joshu.Vortex\\current\\EntityAwarenessOverlay.dll",
+    "desktop": "C:\\Users\\Joshu\\OneDrive\\Desktop\\Vortex\\EntityAwarenessOverlay.dll",
+    "legacy": "C:\\Users\\Joshu\\OneDrive\\Desktop\\CS2-Observer-Overlay\\EntityAwarenessOverlay.dll"
+  },
+  "activeSettingsPreserved": true,
+  "activeSettingsSha256": "A67CE5B3F513338E35F1BC5B9F1C46C178C4EACF8377DC76AFAB66333442C50C",
+  "sourceBackup": "C:\\Users\\Joshu\\AppData\\Local\\Vortex\\backups\\before-triple-integration-20260911-210109.zip",
+  "limitations": [
+    "Native hidden-only player materials unavailable",
+    "Manual map selection for lineup guides",
+    "Economy/skin, weather, scoreboard and other source-specific native systems not fully ported"
+  ],
+  "integrationNotes": "docs/integration-3.26.md",
+  "rendererEvidence": "docs/render-integration-3.26.md",
+  "featureInventory": "docs/anthony-feature-inventory.md",
+  "logs": [
+    "C:\\Users\\Joshu\\AppData\\Local\\Vortex\\Build\\integration-3.26-build.log",
+    "C:\\Users\\Joshu\\AppData\\Local\\Vortex\\Build\\integration-3.26-tests.log",
+    "C:\\Users\\Joshu\\AppData\\Local\\Vortex\\Build\\integration-3.26-package.log"
+  ]
+}

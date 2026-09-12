@@ -1,4 +1,5 @@
 #pragma once
+#include "in_place_reset.hpp"
 #include <chrono>
 #include <cstdint>
 #include <condition_variable>
@@ -41,7 +42,7 @@ template <class Data, class Request> class SnapshotWorker {
                         return;
                     if (std::chrono::steady_clock::now() > deadline_) {
                         active_ = false;
-                        published_ = {};
+                        ResetInPlace(published_);
                         ++serial_;
                         lock.unlock();
                         idle();
@@ -78,6 +79,24 @@ template <class Data, class Request> class SnapshotWorker {
         }
         condition_.notify_one();
     }
+    // Present must never queue behind a publication copy. A missed exchange
+    // retains the previous complete snapshot; its normal freshness deadline
+    // still applies. Request renewal and publication transfer share one lock.
+    bool TryExchange(const Request &request, Data &out, std::uint64_t &serial) {
+        std::unique_lock lock(mutex_, std::try_to_lock);
+        if (!lock.owns_lock())
+            return false;
+        request_ = request;
+        active_ = true;
+        deadline_ = std::chrono::steady_clock::now() + std::chrono::milliseconds(250);
+        if (serial != serial_) {
+            out = published_;
+            serial = serial_;
+        }
+        lock.unlock();
+        condition_.notify_one();
+        return true;
+    }
     void Copy(Data &out) const {
         std::lock_guard lock(mutex_);
         out = published_;
@@ -94,7 +113,7 @@ template <class Data, class Request> class SnapshotWorker {
         {
             std::lock_guard lock(mutex_);
             ++generation_;
-            published_ = {};
+            ResetInPlace(published_);
             ++serial_;
         }
         condition_.notify_one();

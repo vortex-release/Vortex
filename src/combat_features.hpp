@@ -1,15 +1,18 @@
 #pragma once
 #include "preview_pose.hpp"
 #include "weapon_catalog.hpp"
+#include "tracking_profiles.hpp"
 #include <awareness/Trajectories.hpp>
 #include <awareness/CameraTracking.hpp>
 #include <array>
 #include <cmath>
 #include <cstring>
+#include <string_view>
 namespace awareness::combat {
 struct RecoilProfile {
     std::uint32_t overrideDefault{}, startShot{1}, curve{1};
     float vertical{1}, horizontal{1}, smoothing{.012f};
+    std::uint32_t activation{}; // 0 inherit group, 1 on, 2 off.
 };
 inline constexpr std::size_t RecoilProfiles = std::size(WeaponIcons) + 1;
 inline std::size_t WeaponProfile(std::uint32_t weapon) noexcept {
@@ -20,6 +23,7 @@ inline std::size_t WeaponProfile(std::uint32_t weapon) noexcept {
 }
 struct Options {
     std::uint32_t recoil{}, recoilSelection{}, bombTimer{}, hitMarker{}, hitSound{}, damageNumbers{};
+    std::array<std::uint32_t, 6> recoilGroups{0, 0, 1, 1, 0, 0};
     std::uint32_t recoilInput{}; // 0 = Windows mouse input, 1 = native view angles.
     float mouseYaw{.022f}, mousePitch{.022f};
     std::uint32_t ghosts{}, ghostDirection{}, contrast{}, areas{}, hideParticles{};
@@ -35,8 +39,19 @@ struct Options {
     Color bombSafe{1, 1, 1, 1}, bombWarning{1, .8f, .2f, 1}, bombDanger{1, .18f, .12f, 1};
     Color ghostFriend{.3f, .6f, 1, 1}, ghostEnemy{.62f, .25f, 1, 1};
     Color fireColor{.18f, .42f, 1, .25f}, smokeColor{.65f, .7f, .76f, .2f}, blastColor{1, .52f, .1f, .3f};
+    std::uint32_t utilityTimers{}, timerFire{1}, timerSmoke{1};
+    float timerScale{1}, timerRange{60};
+    std::uint32_t hitLog{}, hitLogRows{4}, hitLogBackground{1};
+    float hitLogDuration{3.5f}, hitLogScale{1}, hitLogX{.02f}, hitLogY{.7f};
     char hitSoundPath[2048]{};
     std::array<RecoilProfile, RecoilProfiles> weapons{};
+    bool EnabledFor(std::uint32_t weapon) const noexcept {
+        const auto index = WeaponProfile(weapon);
+        if (!recoil || !index)
+            return false;
+        const auto activation = weapons[index].activation;
+        return activation ? activation == 1 : recoilGroups[static_cast<unsigned>(tracking::WeaponGroup(weapon))] != 0;
+    }
     const RecoilProfile &Profile(std::uint32_t weapon) const noexcept {
         const auto i = WeaponProfile(weapon);
         return weapons[i && weapons[i].overrideDefault ? i : 0];
@@ -48,6 +63,11 @@ inline bool Valid(const Options &s) noexcept {
                    s.contrast, s.areas, s.hideParticles, s.fireArea, s.smokeArea, s.blastArea, s.areaFill, s.areaGlow})
         if (v > 1)
             return false;
+    if (s.utilityTimers > 1 || s.timerFire > 1 || s.timerSmoke > 1 || s.hitLog > 1 || s.hitLogBackground > 1 ||
+        s.hitLogRows < 1 || s.hitLogRows > 8 || !range(s.timerScale, .75f, 1.5f) || !range(s.timerRange, 5, 150) ||
+        !range(s.hitLogDuration, 1, 10) || !range(s.hitLogScale, .75f, 1.5f) || !range(s.hitLogX, 0, 1) ||
+        !range(s.hitLogY, 0, 1))
+        return false;
     if (!range(s.areaOutline, 0, 4))
         return false;
     if (s.recoilInput > 1 || !range(s.mouseYaw, .001f, .1f) || !range(s.mousePitch, .001f, .1f))
@@ -68,8 +88,11 @@ inline bool Valid(const Options &s) noexcept {
                    s.ghostEnemy, s.fireColor, s.smokeColor, s.blastColor})
         if (!range(c.r, 0, 1) || !range(c.g, 0, 1) || !range(c.b, 0, 1) || !range(c.a, 0, 1))
             return false;
+    for (const auto enabled : s.recoilGroups)
+        if (enabled > 1)
+            return false;
     for (const auto &p : s.weapons)
-        if (p.overrideDefault > 1 || p.startShot < 1 || p.startShot > 10 || p.curve > 2 ||
+        if (p.overrideDefault > 1 || p.activation > 2 || p.startShot < 1 || p.startShot > 10 || p.curve > 2 ||
             !range(p.vertical, 0, 1.5f) || !range(p.horizontal, 0, 1.5f) || !range(p.smoothing, 0, .3f))
             return false;
     return true;
@@ -99,6 +122,10 @@ class Recoil {
         }
         if (dt == 0)
             return {};
+        if (dt > .15f) {
+            Reset();
+            return {};
+        }
         if (!initialized_ || owner_ != s.owner || weapon_ != s.weaponHandle || s.gameTime < sampled_ ||
             s.shots < shots_) {
             Reset();
@@ -148,14 +175,24 @@ struct Hit {
     int damage{};
     double time{};
     bool headshot{};
+    char name[64]{}; // Captured with the event; never follows a reused entity slot.
 };
 struct Feedback {
     flight::Ring<Hit, 32> hits;
     std::uint64_t serial{};
-    void Add(std::uint32_t target, Vector3 position, int damage, bool head, double now) noexcept {
+    void Add(std::uint32_t target, Vector3 position, int damage, bool head, double now,
+             std::string_view name = {}) noexcept {
         if (!target || !Finite(position) || damage <= 0 || damage > 1000 || !std::isfinite(now))
             return;
-        hits.Push({++serial, target, position, damage, now, head});
+        Hit hit{++serial, target, position, damage, now, head};
+        auto length = std::min(name.size(), sizeof(hit.name) - 1);
+        // Do not split a UTF-8 sequence when truncating a long player name.
+        if (length < name.size())
+            while (length && (static_cast<unsigned char>(name[length]) & 0xc0) == 0x80)
+                --length;
+        for (std::size_t i = 0; i < length; ++i)
+            hit.name[i] = static_cast<unsigned char>(name[i]) < 32 || name[i] == 127 ? ' ' : name[i];
+        hits.Push(hit);
     }
     void Clear() noexcept { hits.Clear(); }
 };
@@ -166,6 +203,15 @@ struct Bomb {
     int site{};
 };
 enum class AreaType : std::uint32_t { Fire, Smoke, Blast };
+struct AreaTimer {
+    float remaining{}, duration{};
+    bool estimated{};
+    bool Valid() const noexcept {
+        return std::isfinite(remaining) && std::isfinite(duration) && duration > 0 && duration <= 60 && remaining > 0 &&
+               remaining <= duration;
+    }
+    float Progress() const noexcept { return Valid() ? remaining / duration : 0; }
+};
 struct Area {
     std::uint32_t handle{};
     AreaType type{};
@@ -173,6 +219,10 @@ struct Area {
     float radius{}, height{}, remaining{}, duration{};
     std::array<Vector3, 64> boundary{};
     std::uint32_t boundaryCount{};
+    std::array<Vector3, 64> cells{}, cellNormals{};
+    std::uint32_t cellCount{};
+    float cellRadius{25.f};
+    AreaTimer timer;
 };
 struct WorldSnapshot {
     Bomb bomb;
@@ -180,6 +230,14 @@ struct WorldSnapshot {
     std::size_t areaCount{};
     std::uint32_t discovered{}, fireEntities{}, burningCells{}, fireReadFailures{};
     float gameTime{};
+    // Area records are replaced before their count is published. Clearing only
+    // the live range metadata avoids zeroing 150 KB on every reader/render tick.
+    void Clear() noexcept {
+        bomb = {};
+        areaCount = 0;
+        discovered = fireEntities = burningCells = fireReadFailures = 0;
+        gameTime = 0;
+    }
 };
 struct InfernoEvent {
     std::uint32_t index{}, handle{};
@@ -247,6 +305,14 @@ struct GhostTrack {
     flight::Ring<GhostPoint, 72> points;
     bool seen{};
     GhostPoint current{};
+    float movement{};
+    void Clear() noexcept {
+        handle = 0;
+        points.Clear();
+        seen = false;
+        current = {};
+        movement = 0;
+    }
 };
 struct ReplayActor {
     std::uint32_t handle{};
@@ -269,7 +335,7 @@ class GhostHistory {
   public:
     void Clear() noexcept {
         for (auto &t : tracks_)
-            t = {};
+            t.Clear();
     }
     const auto &Tracks() const noexcept { return tracks_; }
     void Begin() noexcept {
@@ -302,12 +368,17 @@ class GhostHistory {
             const auto &last = track->points[track->points.count - 1];
             const double elapsed = now - last.time;
             const float distance = Distance(last.pose.entity.origin, pose.entity.origin);
-            if (elapsed < 0 || elapsed > .25 || distance > 128)
+            if (elapsed < 0 || elapsed > .25 || distance > 128) {
                 track->points.Clear();
-            else {
+                track->movement = 0;
+            } else {
                 if (elapsed < 1. / 32.)
                     return;
                 speed = static_cast<float>(distance / elapsed);
+                const float target = std::clamp(speed / 12.f, 0.f, 1.f);
+                const float smoothing =
+                    1.f - std::exp(-static_cast<float>(elapsed) / (target > track->movement ? .055f : .16f));
+                track->movement += (target - track->movement) * smoothing;
             }
         }
         track->current.speed = speed;
@@ -316,7 +387,7 @@ class GhostHistory {
     void End() noexcept {
         for (auto &t : tracks_)
             if (t.handle && !t.seen)
-                t = {};
+                t.Clear();
     }
 };
 inline bool ReplayPose(const GhostTrack &track, double at, GhostPoint &out) noexcept {
@@ -375,7 +446,7 @@ inline void BuildReplay(const GhostHistory &history, double now, float delay, Re
         GhostPoint past;
         // Root velocity controls visibility; pose separation does not. Keep recording
         // stationary animation so movement resumes without rebuilding the history.
-        actor.movement = std::clamp(track.current.speed / 8.f, 0.f, 1.f);
+        actor.movement = std::clamp(track.movement, 0.f, 1.f);
         actor.ready = actor.movement > .01f && ReplayPose(track, now - std::clamp(delay, .05f, 2.f), past);
         if (actor.ready)
             actor.past = past.pose;

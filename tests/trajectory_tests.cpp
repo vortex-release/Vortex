@@ -242,8 +242,9 @@ int main() {
     Draw(*draw, {}, {}, lasting, false, false, true, Shots::All, 1, 2, matrix, {0, 0, 800, 600}, 23, 1, longStyle);
     Check(draw->VtxBuffer.Size == longBefore, "shortening lifetime immediately hides older lines");
     PathStyle style;
-    Check(style.trailGlow && style.shotGlow && !style.previewGlow && ValidPathStyle(style),
-          "flight and bullet glow enabled by default; held preview stays plain");
+    Check(!style.trailGlow && !style.shotGlow && !style.previewGlow && style.shotWidth == 1.15f &&
+              style.shotLifetime == .5f && ValidPathStyle(style),
+          "default trajectories use thin short strokes without glow");
     Prediction preview;
     preview.valid = true;
     preview.type = Utility::HE;
@@ -260,14 +261,23 @@ int main() {
     style.previewGlow = 1;
     mark = draw->VtxBuffer.Size;
     Draw(*draw, {}, preview, {}, false, true, false, Shots::All, 1, 2, matrix, {0, 0, 800, 600}, 1, 1, style);
-    Check(draw->VtxBuffer.Size - mark == 16, "preview glow can be enabled independently");
+    Check(draw->VtxBuffer.Size - mark == 16 && !style.trailGlow && !style.shotGlow,
+          "preview glow can be enabled independently");
+    mark = draw->VtxBuffer.Size;
+    Draw(*draw, {}, {}, traces, false, false, true, Shots::All, 1, 2, matrix, {0, 0, 800, 600}, 1, 1, style);
+    Check(draw->VtxBuffer.Size - mark == 8 && draw->VtxBuffer[mark + 2].col == IM_COL32(0, 255, 0, 255) &&
+              draw->VtxBuffer[mark + 3].col == IM_COL32(0, 0, 255, 255),
+          "default bullet stroke keeps both endpoint colors without adding glow geometry");
+    // Exercise the optional strong treatment explicitly; it is no longer the shipped default.
+    style.shotGlow = style.trailGlow = 1;
+    style.shotStrength = 2.4f;
     mark = draw->VtxBuffer.Size;
     Draw(*draw, {}, {}, traces, false, false, true, Shots::All, 1, 2, matrix, {0, 0, 800, 600}, 1, 1, style);
     Check(draw->VtxBuffer.Size - mark > 16 && draw->VtxBuffer[mark + 6].col == IM_COL32(0, 255, 0, 255) &&
               draw->VtxBuffer[mark + 7].col == IM_COL32(0, 0, 255, 255),
           "strong bullet glow keeps endpoint colors and adds its fine core");
     const auto haloAlpha = draw->VtxBuffer[mark + 4].col >> IM_COL32_A_SHIFT;
-    Check(haloAlpha > 170 && haloAlpha < 200, "default bullet halo remains bright outside the core");
+    Check(haloAlpha > 170 && haloAlpha < 200, "explicit strong bullet halo remains bright outside the core");
     style.shotGlow = 0;
     mark = draw->VtxBuffer.Size;
     Draw(*draw, {}, {}, traces, false, false, true, Shots::All, 1, 2, matrix, {0, 0, 800, 600}, 1, 1, style);

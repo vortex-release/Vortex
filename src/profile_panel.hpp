@@ -32,17 +32,33 @@ inline void DrawProfilePanel(const View &view, Request &request) {
         request.operation = operation;
         request.name = name;
     };
-    ImGui::TextWrapped("Keep separate setups for different sessions. Named profiles are snapshots; Auto-save updates "
-                       "your working settings without replacing them.");
     if (view.busy)
         ImGui::TextColored(studio::Accent, "Working...");
     else if (!view.message.empty())
         ImGui::TextWrapped("%s", view.message.c_str());
     ImGui::Dummy({0, 6 * scale});
-    studio::Card("My library", "CONFIGURATION PROFILES");
-    if (!view.loadedName.empty())
-        ImGui::Text("Last loaded: %s", view.loadedName.c_str());
-    ImGui::TextDisabled("%zu / %zu profiles", view.entries.size(), MaximumProfiles);
+    ImGui::BeginDisabled(view.busy);
+    ImGui::SetNextItemWidth(std::max(80.f, ImGui::GetContentRegionAvail().x - 121 * scale));
+    ImGui::InputTextWithHint("##NewProfileName", "New profile name", newName, sizeof(newName));
+    testing::Record("Profile name");
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!ValidName(newName) || view.entries.size() >= MaximumProfiles);
+    if (studio::Button("Create profile", {110 * scale, 0}))
+        action(Operation::Create, newName);
+    ImGui::EndDisabled();
+    if (studio::Button("Import..."))
+        action(Operation::Import);
+    ImGui::SameLine();
+    if (studio::Button("Open folder"))
+        action(Operation::OpenFolder);
+    ImGui::SameLine();
+    if (studio::Button("Refresh"))
+        action(Operation::Refresh);
+    ImGui::EndDisabled();
+    ImGui::Spacing();
+    studio::Card("My library",
+                 "Named snapshots stay separate from Auto-save. Load a profile to restore all its settings.");
+
     ImGui::SetNextItemWidth(-FLT_MIN);
     ImGui::InputTextWithHint("##ProfileSearch", "Find a profile", filter, sizeof(filter));
     const auto matches = [&](const std::string &name) {
@@ -58,7 +74,7 @@ inline void DrawProfilePanel(const View &view, Request &request) {
         if (matches(view.entries[i].name))
             visibleRows[visibleCount++] = i;
     const bool selectedVisible = !selected.empty() && matches(selected);
-    const float listHeight = std::clamp(static_cast<float>(visibleCount) * 47.f + 14.f, 70.f, 188.f) * scale;
+    const float listHeight = std::clamp(static_cast<float>(visibleCount) * 47.f + 14.f, 70.f, 132.f) * scale;
     if (ImGui::BeginListBox("##ProfileLibrary", {-FLT_MIN, listHeight})) {
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, {0, 4 * scale});
         ImGuiListClipper clipper;
@@ -117,7 +133,7 @@ inline void DrawProfilePanel(const View &view, Request &request) {
         ImGui::EndTable();
     }
     ImGui::EndDisabled();
-    ImGui::TextDisabled("Replace updates only the selected saved profile.");
+    studio::Tip("Replace updates only the selected saved profile.");
     if (ImGui::CollapsingHeader("Manage selected profile")) {
         ImGui::BeginDisabled(view.busy || !selectedVisible);
         ImGui::SetNextItemWidth(-FLT_MIN);
@@ -131,32 +147,8 @@ inline void DrawProfilePanel(const View &view, Request &request) {
         if (studio::Button("Archive profile"))
             action(Operation::Archive, selected);
         ImGui::EndDisabled();
-        ImGui::TextWrapped("Archive keeps a recoverable file in the profile folder. Import it again to restore it.");
+        studio::Tip("Archive keeps a recoverable file. Import it again to restore it.");
     }
-    studio::EndCard();
-    studio::Card("Save a new setup");
-    ImGui::BeginDisabled(view.busy);
-    ImGui::SetNextItemWidth(-FLT_MIN);
-    ImGui::InputTextWithHint("##NewProfileName", "Profile name", newName, sizeof(newName));
-    testing::Record("Profile name");
-    ImGui::BeginDisabled(!ValidName(newName) || view.entries.size() >= MaximumProfiles);
-    if (studio::Button("Create profile", {-FLT_MIN, 31 * scale}))
-        action(Operation::Create, newName);
-    ImGui::EndDisabled();
-    if (ImGui::BeginTable("Profile file actions", 3, ImGuiTableFlags_SizingStretchSame)) {
-        ImGui::TableNextColumn();
-        if (studio::Button("Import...", {-FLT_MIN, 30 * scale}))
-            action(Operation::Import);
-        ImGui::TableNextColumn();
-        if (studio::Button("Refresh", {-FLT_MIN, 30 * scale}))
-            action(Operation::Refresh);
-        ImGui::TableNextColumn();
-        if (studio::Button("Open folder", {-FLT_MIN, 30 * scale}))
-            action(Operation::OpenFolder);
-        ImGui::EndTable();
-    }
-    ImGui::EndDisabled();
-    ImGui::TextWrapped("INI profiles include every setting. Fonts, images and sounds keep their file paths.");
     studio::EndCard();
 }
 } // namespace awareness::profiles

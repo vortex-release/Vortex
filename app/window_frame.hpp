@@ -4,6 +4,7 @@
 #include <dwmapi.h>
 #include <imgui.h>
 #include "../src/menu_motion.hpp"
+#include "../src/ui_icons.hpp"
 namespace vortex {
 inline LRESULT FrameHitTest(HWND window, LPARAM point) noexcept {
     RECT r{};
@@ -58,21 +59,11 @@ inline void FrameControls(HWND window, bool animated = true) {
         if (ImGui::IsItemFocused() && ImGui::GetIO().NavVisible)
             d->AddRect(p, {p.x + 36 * s, p.y + 30 * s}, ImGui::GetColorU32(ImGuiCol_NavCursor), 5 * s);
         const auto color = IM_COL32(231, 229, 240, 255);
-        if (i == 0)
-            d->AddLine({p.x + 13 * s, p.y + 16 * s}, {p.x + 23 * s, p.y + 16 * s}, color, 1.2f);
-        if (i == 1) {
-            if (IsZoomed(window)) {
-                d->AddRect({p.x + 15 * s, p.y + 10 * s}, {p.x + 23 * s, p.y + 18 * s}, color, 1, 1.2f * s);
-                d->AddRectFilled({p.x + 12 * s, p.y + 13 * s}, {p.x + 20 * s, p.y + 21 * s},
-                                 ImGui::GetColorU32(ImGuiCol_WindowBg), 1);
-                d->AddRect({p.x + 12 * s, p.y + 13 * s}, {p.x + 20 * s, p.y + 21 * s}, color, 1, 1.2f * s);
-            } else
-                d->AddRect({p.x + 14 * s, p.y + 11 * s}, {p.x + 22 * s, p.y + 19 * s}, color, 1, 1.2f * s);
-        }
-        if (i == 2) {
-            d->AddLine({p.x + 14 * s, p.y + 11 * s}, {p.x + 22 * s, p.y + 19 * s}, color, 1.3f);
-            d->AddLine({p.x + 22 * s, p.y + 11 * s}, {p.x + 14 * s, p.y + 19 * s}, color, 1.3f);
-        }
+        const auto icon = i == 0             ? icons::Id::Minus
+                          : i == 2           ? icons::Id::X
+                          : IsZoomed(window) ? icons::Id::Copy
+                                             : icons::Id::Square;
+        icons::Draw(d, icon, {p.x + 10 * s, p.y + 7 * s}, 16 * s, color);
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
             ImGui::SetTooltip("%s", i == 0   ? "Minimize"
                                     : i == 1 ? (IsZoomed(window) ? "Restore" : "Maximize")

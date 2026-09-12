@@ -22,7 +22,7 @@ foreach ($name in @('EntityAwarenessOverlay.dll','ObserverDemo.exe','awareness_c
 Copy-Item -LiteralPath (Join-Path $project 'START-HERE.txt') -Destination (Join-Path $Destination 'Read Me.txt') -Force
 Copy-Item -LiteralPath (Join-Path $project 'Camera Tracking.cmd') -Destination $Destination -Force
 Copy-Item -LiteralPath (Join-Path $project 'LICENSE') -Destination (Join-Path $Destination 'LICENSE.txt') -Force
-foreach ($name in @('Dear-ImGui-LICENSE.txt','MinHook-LICENSE.txt','Valve-Assets-NOTICE.txt')) { Copy-Item -LiteralPath (Join-Path $project "licenses\$name") -Destination $Destination -Force }
+foreach ($name in @('Dear-ImGui-LICENSE.txt','MinHook-LICENSE.txt','Valve-Assets-NOTICE.txt','Lucide-LICENSE.txt','Lefrizzel-Ai-LICENSE.txt')) { Copy-Item -LiteralPath (Join-Path $project "licenses\$name") -Destination $Destination -Force }
 Copy-Item -LiteralPath (Join-Path $project 'DefaultSettings.ini') -Destination $Destination -Force
 $profileAssets=Join-Path $Destination 'profile'
 New-Item -ItemType Directory -Path $profileAssets -Force | Out-Null

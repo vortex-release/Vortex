@@ -60,8 +60,10 @@ Output VS(Input v) {
     o.n=normalize(mul(float4(v.n,0),m).xyz); o.uv=v.uv; return o;
 }
 Texture2D albedo:register(t0);
+Texture2D<float> currentMask:register(t1);
 SamplerState linearSampler:register(s0);
 float4 PS(Output v):SV_TARGET {
+    if(options.z>0 && currentMask.Load(int3(v.p.xy,0))>.1) discard;
     if(options.y>0) {
         float lighting=.55+.45*saturate(dot(normalize(v.n),normalize(float3(-.4,.7,1))));
         return float4(color.rgb*lighting,color.a);
@@ -87,6 +89,8 @@ struct ModelPreview::Data {
     ComPtr<ID3D11BlendState> ghostBlend, ghostMask;
     ComPtr<ID3D11DepthStencilState> ghostEqual, ghostLess, ghostGreater;
     ComPtr<ID3D11Texture2D> ghostDepthTexture;
+    ComPtr<ID3D11RenderTargetView> ghostExclusionTarget;
+    ComPtr<ID3D11ShaderResourceView> ghostExclusionView;
     DXGI_FORMAT ghostFormat{DXGI_FORMAT_UNKNOWN};
     UINT ghostWidth{}, ghostHeight{};
     std::array<ComPtr<ID3D11ShaderResourceView>, 5> textures;
@@ -273,6 +277,7 @@ HRESULT ModelPreview::Render(ID3D11DeviceContext *context, const PreviewPose *po
         std::memcpy(&vp, &ghost->matrix, sizeof(vp));
         XMStoreFloat4x4(&constants.viewProjection, XMMatrixTranspose(XMLoadFloat4x4(&vp)));
         constants.options.y = 1;
+        constants.options.z = ghost->exclusions ? 1.f : 0.f;
     }
     constants.color = {effects.materialColor.r, effects.materialColor.g, effects.materialColor.b,
                        effects.materialColor.a};
@@ -280,6 +285,8 @@ HRESULT ModelPreview::Render(ID3D11DeviceContext *context, const PreviewPose *po
     context->UpdateSubresource(d.constants.Get(), 0, nullptr, &constants, 0, 0);
     ID3D11ShaderResourceView *empty{};
     context->PSSetShaderResources(0, 1, &empty);
+    auto *exclusions = ghost ? ghost->exclusions : nullptr;
+    context->PSSetShaderResources(1, 1, &exclusions);
     const float clear[4]{};
     if (!ghost) {
         context->ClearRenderTargetView(d.target.Get(), clear);
@@ -289,7 +296,7 @@ HRESULT ModelPreview::Render(ID3D11DeviceContext *context, const PreviewPose *po
     context->OMSetRenderTargets(1, &target, ghost ? ghost->depth : d.depth.Get());
     context->OMSetDepthStencilState(
         ghost ? (ghost->reversed ? d.ghostGreater.Get() : d.ghostLess.Get()) : d.depthState.Get(), 0);
-    context->OMSetBlendState(ghost && !ghost->mask ? d.ghostBlend.Get() : nullptr, nullptr, ~0u);
+    context->OMSetBlendState(ghost ? (ghost->mask ? d.ghostMask.Get() : d.ghostBlend.Get()) : nullptr, nullptr, ~0u);
     context->RSSetState(d.raster.Get());
     const D3D11_VIEWPORT viewport =
         ghost
@@ -443,6 +450,8 @@ HRESULT ModelPreview::RenderGhosts(ID3D11DeviceContext *context, ID3D11RenderTar
     if (!d.ghostDepth || d.ghostWidth != width || d.ghostHeight != height || d.ghostFormat != depthDesc.Format) {
         d.ghostDepth.Reset();
         d.ghostDepthTexture.Reset();
+        d.ghostExclusionTarget.Reset();
+        d.ghostExclusionView.Reset();
         HRESULT hr = device->CreateTexture2D(&depthDesc, nullptr, &d.ghostDepthTexture);
         if (FAILED(hr))
             return hr;
@@ -452,12 +461,41 @@ HRESULT ModelPreview::RenderGhosts(ID3D11DeviceContext *context, ID3D11RenderTar
         d.ghostHeight = height;
         d.ghostFormat = depthDesc.Format;
     }
-    // Use a private copy when the host supplies scene depth; never write to it.
-    if (sourceDepth)
-        context->CopyResource(d.ghostDepthTexture.Get(), sourceDepth.Get());
-    else
-        context->ClearDepthStencilView(d.ghostDepth.Get(), D3D11_CLEAR_DEPTH, reversed ? 0.f : 1.f, 0);
-    GhostSurface surface{frame.viewProjection, viewport, target, d.ghostDepth.Get(), false, reversed};
+    if (!d.ghostExclusionTarget) {
+        auto maskDesc = depthDesc;
+        maskDesc.Format = DXGI_FORMAT_R8_UNORM;
+        maskDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+        ComPtr<ID3D11Texture2D> mask;
+        HRESULT hr = device->CreateTexture2D(&maskDesc, nullptr, &mask);
+        if (FAILED(hr))
+            return hr;
+        if (FAILED(hr = device->CreateRenderTargetView(mask.Get(), nullptr, &d.ghostExclusionTarget)))
+            return hr;
+        if (FAILED(hr = device->CreateShaderResourceView(mask.Get(), nullptr, &d.ghostExclusionView)))
+            return hr;
+    }
+    // A cleared private depth would silently put replay actors over every wall.
+    // Wait for validated scene depth instead; only the preview studio uses blank depth.
+    if (!sourceDepth)
+        return S_FALSE;
+    context->CopyResource(d.ghostDepthTexture.Get(), sourceDepth.Get());
+    ID3D11ShaderResourceView *emptyMask{};
+    context->PSSetShaderResources(1, 1, &emptyMask);
+    const float clearMask[4]{};
+    context->ClearRenderTargetView(d.ghostExclusionTarget.Get(), clearMask);
+    GhostSurface maskSurface{frame.viewProjection, viewport, d.ghostExclusionTarget.Get(),
+                             d.ghostDepth.Get(),   false,    reversed};
+    // Mark only current visible silhouettes, not boxes or distance thresholds.
+    // The replay shader excludes these pixels even when the past pose is closer.
+    for (std::size_t t = 0; t < count; ++t) {
+        EffectsConfiguration mask;
+        mask.materialColor = {1, 1, 1, 1};
+        const auto hr = Render(context, &candidates[t].track->current, 0, false, mask, &maskSurface);
+        if (FAILED(hr))
+            return hr;
+    }
+    GhostSurface surface{frame.viewProjection,      viewport, target, d.ghostDepth.Get(), false, reversed,
+                         d.ghostExclusionView.Get()};
     for (std::size_t t = count; t-- > 0;) {
         const auto &track = *candidates[t].track;
         {
@@ -473,6 +511,7 @@ HRESULT ModelPreview::RenderGhosts(ID3D11DeviceContext *context, ID3D11RenderTar
                 return hr;
         }
     }
+    context->PSSetShaderResources(1, 1, &emptyMask);
     return S_OK;
 }
 void ModelPreview::Drag(float amount) noexcept {
