@@ -31,6 +31,7 @@ int main(int argc, char **argv) {
     config.teamFilter = TeamFilter::TeammatesOnly;
     strcpy_s(config.fontPath, "C:\\fonts\\custom.ttf");
     visual.playerStyle = {1, .18f, 7, .6f, {.1f, .2f, .3f, .4f}, {.5f, .6f, .7f, .8f}, 1.3f, .5f, .4f, 2};
+    visual.skeleton = {1, 0, 1, 1, 2.1f, .65f, {.2f, .4f, .6f, .8f}};
     visual.sky = {1, .4f, {.2f, .3f, .4f, 1}};
     visual.combat.sceneGamma = 1.3f;
     visual.combat.sceneVibrance = .3f;
@@ -298,6 +299,13 @@ int main(int argc, char **argv) {
               loadedVisual.combat.sceneTemperature == -.2f && loadedVisual.combat.sceneShadows == .1f &&
               loadedVisual.combat.sceneHighlights == -.2f,
           "extended player and world styling survives save/load");
+    check(loadedVisual.skeleton.enabled && !loadedVisual.skeleton.teamColor && loadedVisual.skeleton.outline &&
+              loadedVisual.skeleton.joints && loadedVisual.skeleton.width == 2.1f &&
+              loadedVisual.skeleton.opacity == .65f && loadedVisual.skeleton.color.a == .8f,
+          "skeleton settings survive profile save/load");
+    auto invalidSkeleton = loadedVisual;
+    invalidSkeleton.skeleton.width = std::numeric_limits<float>::quiet_NaN();
+    check(!ValidVisualOptions(invalidSkeleton), "nonfinite skeleton width rejected");
     auto invalidBadge = loadedVisual;
     invalidBadge.badgeScale = 0;
     check(!ValidVisualOptions(invalidBadge), "zero badge scale rejected");

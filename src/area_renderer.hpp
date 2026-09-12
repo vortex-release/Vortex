@@ -3,11 +3,16 @@
 #include "entity_effects.hpp"
 #include <cstring>
 namespace awareness::combat {
+struct AreaRenderStats {
+    unsigned areas{}, cells{}, eventFootprints{}, rejected{}, vertices{};
+};
 // Cell-derived geometry is cached independently of camera movement and frame-rate.
 class AreaRenderer {
     struct Cached {
         std::uint32_t handle{}, count{};
         float radius{};
+        Vector3 center{};
+        bool eventFootprint{};
         std::array<Vector3, 64> cells{}, normals{};
         std::vector<EffectVertex> vertices;
         bool used{};
@@ -16,6 +21,7 @@ class AreaRenderer {
     std::vector<EffectVertex> combined_;
     EntityEffects renderer_;
     unsigned rebuilds_{};
+    AreaRenderStats stats_;
     void Build(Cached &, const Area &);
 
   public:
@@ -23,5 +29,6 @@ class AreaRenderer {
                    ID3D11DepthStencilView *, bool, const Matrix4x4 &, Viewport, const WorldSnapshot &, const Options &,
                    float opacity, EffectsState &);
     unsigned GeometryRebuilds() const noexcept { return rebuilds_; }
+    const AreaRenderStats &State() const noexcept { return stats_; }
 };
 } // namespace awareness::combat

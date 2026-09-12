@@ -340,15 +340,17 @@ int main() {
     fireEvents.Update(2, 0x80002u, {120, 40, 0}, 5, true);
     combat::WorldSnapshot eventWorld;
     combat::AppendInfernoEvents(fireEvents, 5.1, eventWorld);
-    Check(eventWorld.areaCount == 1 && eventWorld.areas[0].center.x == 120 && eventWorld.areas[0].radius > 42,
-          "fire start immediately provides a ground footprint");
+    Check(eventWorld.areaCount == 1 && eventWorld.areas[0].center.x == 120 && eventWorld.areas[0].radius > 42 &&
+              eventWorld.areas[0].estimatedFootprint && !eventWorld.areas[0].cellCount,
+          "fire start immediately provides an explicit event-only ground footprint");
     combat::AppendInfernoEvents(fireEvents, 5.2, eventWorld);
     Check(eventWorld.areaCount == 1, "event footprint cannot duplicate a cell-derived inferno");
     f.Entity(2, fire, "unavailable_designer_name");
     WorldReader eventReader;
     eventReader.Update(f.memory, Fixture::list, pawn, 120, 5.1, eventWorld, fireEvents);
-    Check(eventWorld.areaCount >= 1 && eventWorld.burningCells == 2,
-          "fire event seeds the exact entity's burning-cell reader");
+    Check(eventWorld.areaCount >= 1 && eventWorld.burningCells == 2 && !eventWorld.areas[0].estimatedFootprint &&
+              eventWorld.areas[0].cellCount == 2,
+          "fire event seeds exact cells which replace the event-only estimate");
     fireEvents.Update(2, 0, {}, 5.3, false);
     eventWorld = {};
     combat::AppendInfernoEvents(fireEvents, 5.4, eventWorld);

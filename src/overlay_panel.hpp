@@ -34,13 +34,16 @@ struct PanelInformation {
     const awareness::profiles::View *profiles{};
     awareness::TrackingState trackingState{};
     awareness::EffectsState effectsState{};
-    std::uint32_t bonePositions{}, failedBoneReads{};
+    std::uint32_t bonePositions{}, failedBoneReads{}, skeletonPlayers{};
     bool waitingForBind{};
     std::uint64_t tracerCallbacks{}, acceptedTracers{}, recoilWrites{};
     bool recoilInput{};
     HRESULT recoilResult{S_FALSE};
     const char *soundStatus{}, *hitSoundStatus{};
     bool pathsConnected{}, viewConnected{}, eventsConnected{}, tracerConnected{}, punchConnected{};
+    const char *predictionStatus{"Disabled"};
+    std::uint64_t predictionAttempts{}, predictionFailures{};
+    unsigned predictionPoints{};
     std::uint64_t fireSamples{}, fireEvents{}, impactEvents{}, rejectedTracers{}, recoilReadFailures{};
     std::uint32_t recoilWeapon{}, recoilShots{};
     awareness::Vector3 recoilPunch{};
@@ -56,7 +59,8 @@ struct PanelInformation {
     bool keepAwakeActive{};
     bool trajectoryDepth{}, areaDepth{};
     unsigned trajectoryVertices{}, trajectoryDrawCalls{}, areaCells{};
-    HRESULT trajectoryResult{S_FALSE};
+    HRESULT trajectoryResult{S_FALSE}, areaResult{S_FALSE};
+    unsigned renderedAreas{}, areaVertices{}, estimatedAreas{}, rejectedAreas{};
     std::uint32_t utilityEntities{}, fireEntities{}, burningCells{}, fireReadFailures{}, areaCount{};
     awareness::lineups::Controller *lineupController{};
     awareness::lineups::PanelState *lineupPanel{};
@@ -368,6 +372,8 @@ inline bool DrawFeatureSection(int section, awareness::Configuration &c, awarene
                     changed |= FlagControl("Weapons", v.weaponIcons);
                     ImGui::TableNextColumn();
                     changed |= FlagControl("Lines", c.lines);
+                    ImGui::TableNextColumn();
+                    changed |= FlagControl("Skeleton", v.skeleton.enabled);
                     ImGui::EndTable();
                 }
                 studio::EndCard();
@@ -468,6 +474,19 @@ inline bool DrawFeatureSection(int section, awareness::Configuration &c, awarene
                 ImGui::EndTabItem();
             }
             if (studio::Tab("Style")) {
+                studio::Card("Skeleton");
+                changed |= FlagControl("Enabled", v.skeleton.enabled);
+                changed |= FlagControl("Player colors", v.skeleton.teamColor);
+                if (!v.skeleton.teamColor)
+                    changed |= ColorControl("Color", v.skeleton.color);
+                changed |= FlagControl("Outline", v.skeleton.outline);
+                changed |= FlagControl("Joint dots", v.skeleton.joints);
+                if (BeginForm("Skeleton geometry")) {
+                    changed |= FloatRow("Width", v.skeleton.width, .5f, 4, "%.1f");
+                    changed |= FloatRow("Opacity", v.skeleton.opacity, 0, 1, "%.2f");
+                    ImGui::EndTable();
+                }
+                studio::EndCard();
                 studio::Card("Boxes & labels");
                 changed |= FlagControl("Corners", v.cornerBoxes);
                 changed |= FlagControl("Fill", v.fillBoxes);
@@ -790,6 +809,7 @@ inline bool DrawFeatureSection(int section, awareness::Configuration &c, awarene
                 ImGui::Text("Native frame dispatcher: %s   Fault mask %u",
                             info.nativeFramesReady ? "connected" : "unavailable", info.nativeFrameFailures);
                 ImGui::Text("Loadout: %s   Material refreshes %u", info.cosmeticsStatus, info.cosmeticsRefreshes);
+                ImGui::Text("Skeleton poses: %u", info.skeletonPlayers);
                 ImGui::Text("Hidden model bridge: %s   Queued %u   Matched %u",
                             models.hiddenBridgeReady ? "ready" : "unavailable", models.hiddenQueued,
                             models.hiddenMatched);
@@ -814,12 +834,20 @@ inline bool DrawFeatureSection(int section, awareness::Configuration &c, awarene
                 ImGui::Text("Effects %llu   Accepted %llu   Rejected %llu", info.tracerCallbacks, info.acceptedTracers,
                             info.rejectedTracers);
                 ImGui::Text("Projected %u   Outside view %u", info.visibleTracers, info.clippedTracers);
+                ImGui::Text("Preview: %s   Points %u", info.predictionStatus, info.predictionPoints);
+                ImGui::Text("Prediction attempts %llu   Failures %llu", info.predictionAttempts,
+                            info.predictionFailures);
                 ImGui::Text("Trajectory depth %s   Vertices %u   Draws %u",
                             info.trajectoryDepth ? "ready" : "unavailable", info.trajectoryVertices,
                             info.trajectoryDrawCalls);
                 if (FAILED(info.trajectoryResult))
                     ImGui::Text("Trajectory render %08X", static_cast<unsigned>(info.trajectoryResult));
-                ImGui::Text("Area depth %s   Cells %u", info.areaDepth ? "ready" : "unavailable", info.areaCells);
+                ImGui::Text("Area depth %s   Cells %u   Footprints %u", info.areaDepth ? "ready" : "unavailable",
+                            info.areaCells, info.estimatedAreas);
+                ImGui::Text("Area geometry %u   Vertices %u   Rejected %u", info.renderedAreas, info.areaVertices,
+                            info.rejectedAreas);
+                if (FAILED(info.areaResult))
+                    ImGui::Text("Area render %08X", static_cast<unsigned>(info.areaResult));
                 ImGui::Text("Weapon %u   Burst %u   Punch %.3f / %.3f", info.recoilWeapon, info.recoilShots,
                             info.recoilPunch.x, info.recoilPunch.y);
                 ImGui::Text("Failed recoil reads %llu", info.recoilReadFailures);

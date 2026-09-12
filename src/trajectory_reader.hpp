@@ -152,6 +152,7 @@ class EntityDiscovery {
 };
 class ProjectileTracker {
     ProjectileFrame tracked_;
+    std::array<double, 64> lastRead_{};
     EntityDiscovery discovery_;
     double previous_{};
 
@@ -176,20 +177,32 @@ class ProjectileTracker {
                 for (std::uint32_t i = 0; i < tracked_.count; ++i)
                     if (tracked_.values[i].handle == sample.handle)
                         return;
-                if (tracked_.count < tracked_.values.size())
+                if (tracked_.count < tracked_.values.size()) {
+                    lastRead_[tracked_.count] = now;
                     tracked_.values[tracked_.count++] = sample;
+                }
             })) {
             Reset();
             return false;
         }
         result.generation = list;
+        std::uint32_t retained{};
         for (std::uint32_t i = 0; i < tracked_.count; ++i) {
-            const auto &sample = tracked_.values[i];
+            auto sample = tracked_.values[i];
+            auto last = lastRead_[i];
             if (ReadProjectile(m, EntityAt(m, list, sample.handle), sample.type, result.values[result.count],
-                               sample.handle))
-                ++result.count;
+                               sample.handle)) {
+                sample = result.values[result.count++];
+                last = now;
+            } else if (now - last > .25) {
+                continue;
+            }
+            // Retry the full identity briefly without publishing stale positions or
+            // waiting for the budgeted discovery scan to wrap around the entire list.
+            tracked_.values[retained] = sample;
+            lastRead_[retained++] = last;
         }
-        tracked_ = result;
+        tracked_.count = retained;
         return true;
     }
 };
@@ -243,27 +256,32 @@ inline bool ReadTracerEffect(const Memory &m, std::uintptr_t list, std::uintptr_
 inline bool ReadThrow(const Memory &m, std::uintptr_t list, std::uintptr_t pawn, Vector3 angles,
                       flight::Throw &result) noexcept {
     result = {};
-    std::uintptr_t services{};
-    std::uint32_t weaponHandle{};
+    std::uintptr_t services{}, identity{};
+    std::uint32_t weaponHandle{}, current{}, after{};
     std::uint16_t id{};
-    if (!PlayerEye(m, pawn, result.eye) || !m.Field(pawn, offsets::AbsVelocity, result.velocity) ||
-        !Finite(result.velocity) || !m.Field(pawn, offsets::WeaponServices, services) ||
-        !m.Field(services, offsets::ActiveWeapon, weaponHandle))
+    if (!Finite(angles) || std::abs(angles.x) > 89.1f || !PlayerEye(m, pawn, result.eye) ||
+        !m.Field(pawn, offsets::AbsVelocity, result.velocity) || !Finite(result.velocity) ||
+        !m.Field(pawn, offsets::WeaponServices, services) || !m.Field(services, offsets::ActiveWeapon, weaponHandle))
         return false;
     const auto weapon = EntityAt(m, list, weaponHandle);
-    if (!m.Field(weapon, offsets::AttributeManager + offsets::ItemView + offsets::ItemDefinition, id))
+    if (!m.Field(weapon, offsets::Identity, identity) || !m.Field(identity, 0x10, current) || current != weaponHandle ||
+        !m.Field(weapon, offsets::AttributeManager + offsets::ItemView + offsets::ItemDefinition, id))
         return false;
     result.type = flight::Weapon(id);
     if (result.type == flight::Utility::None)
         return false;
     float throwTime{};
     std::uint8_t pin{};
-    if (!m.Field(weapon, offsets::ThrowTime, throwTime) || throwTime > 0 || !m.Field(weapon, offsets::PinPulled, pin))
+    if (!m.Field(weapon, offsets::ThrowTime, throwTime) || !std::isfinite(throwTime) || throwTime > 0 ||
+        !m.Field(weapon, offsets::PinPulled, pin))
         return false;
     if (pin && (!m.Field(weapon, offsets::ThrowStrength, result.strength) || !std::isfinite(result.strength)))
         return false;
+    if (!m.Field(identity, 0x10, after) || after != weaponHandle || !m.Field(services, offsets::ActiveWeapon, after) ||
+        after != weaponHandle)
+        return false;
     result.pitch = angles.x;
-    result.yaw = angles.y;
+    result.yaw = std::remainder(angles.y, 360.f);
     return true;
 }
 } // namespace awareness::cs2

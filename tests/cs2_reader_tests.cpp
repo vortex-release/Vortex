@@ -1,4 +1,5 @@
 #include "cs2_reader.hpp"
+#include "skeleton_reader.hpp"
 #include "latency_reader.hpp"
 #include <vector>
 #include <cstdio>
@@ -261,6 +262,53 @@ int main() {
     std::array<char, 64> partialName{};
     Check(!partial.Read(std::uintptr_t{1}, partialName) && partialName == std::array<char, 64>{},
           "failed array reads clear all output bytes");
+    {
+        Fixture bones;
+        FrameSnapshot snapshot;
+        ReadReport boneReport;
+        ReadFrame(bones.memory, bones.globals, snapshot, boneReport);
+        const auto &entity = snapshot.entities[1];
+        bones.Put(Fixture::Scene(1) + offsets::ModelState + offsets::BoneCount, std::uint16_t{25});
+        for (unsigned i = 0; i < skeleton::JointCount; ++i)
+            bones.Put(Fixture::Bones(1) + i * offsets::BoneStride,
+                      BoneTransform{entity.origin + Vector3{0, 0, float(i + 1)}, 1, {0, 0, 0, 1}});
+        skeleton::Pose pose;
+        Check(ReadSkeletonPose(bones.memory, Fixture::Scene(1), entity, pose) && pose.entity == entity.id &&
+                  skeleton::Segment(pose, 17, 18) && skeleton::Segment(pose, 10, 11),
+              "skeleton publishes validated arm and leg joints from a bounded array read");
+        bones.Put(Fixture::Bones(1) + 11 * offsets::BoneStride, BoneTransform{{}, 0, {0, 0, 0, 0}});
+        Check(ReadSkeletonPose(bones.memory, Fixture::Scene(1), entity, pose) && !skeleton::Segment(pose, 10, 11) &&
+                  skeleton::Segment(pose, 17, 18),
+              "unavailable wrist skips only affected skeleton edges");
+        bones.Put(Fixture::Bones(1) + 18 * offsets::BoneStride,
+                  BoneTransform{entity.origin + Vector3{0, 0, 2000}, 1, {0, 0, 0, 1}});
+        Check(ReadSkeletonPose(bones.memory, Fixture::Scene(1), entity, pose) && !skeleton::Segment(pose, 17, 18),
+              "outlying joint cannot draw a screen-spanning skeleton line");
+        auto dead = entity;
+        dead.health = 0;
+        Check(!ReadSkeletonPose(bones.memory, Fixture::Scene(1), dead, pose) && !pose.validMask,
+              "dead entities clear the skeletal publication");
+        bones.Put(Fixture::Scene(1) + offsets::ModelState + offsets::BoneCount, std::uint16_t{8});
+        Check(!ReadSkeletonPose(bones.memory, Fixture::Scene(1), entity, pose),
+              "short skeleton arrays cannot be overread");
+        bones.Put(Fixture::Scene(1) + offsets::ModelState + offsets::BoneCount, std::uint16_t{25});
+        struct Moving {
+            Fixture *fixture;
+            unsigned pointerReads{};
+        } moving{&bones};
+        Memory changed{&moving, [](void *ctx, std::uintptr_t address, void *out, std::size_t size) noexcept {
+                           auto &m = *static_cast<Moving *>(ctx);
+                           if (address == Fixture::Scene(1) + offsets::ModelState + offsets::BoneArray &&
+                               ++m.pointerReads == 2) {
+                               const std::uintptr_t replacement = Fixture::Bones(2);
+                               std::memcpy(out, &replacement, size);
+                               return true;
+                           }
+                           return Fixture::Read(m.fixture, address, out, size);
+                       }};
+        Check(!ReadSkeletonPose(changed, Fixture::Scene(1), entity, pose) && !pose.validMask,
+              "bone array replacement during sampling discards the entire pose");
+    }
     std::printf("%d checks, %d failures\n", checks, failures);
     return failures ? 1 : 0;
 }

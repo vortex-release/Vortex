@@ -118,7 +118,9 @@ class Trails {
             if (!p)
                 p = &*std::min_element(paths_.begin(), paths_.end(),
                                        [](auto &a, auto &b) { return a.lastSeen < b.lastSeen; });
-            if (p->handle != s.handle || !p->active ||
+            // A missed asynchronous sample does not create a new projectile. Keep
+            // its history through short read gaps; full handles still separate reuse.
+            if (p->handle != s.handle || p->type != s.type || (!p->active && now - p->lastSeen > .25) ||
                 (p->points.count && Distance(p->points[p->points.count - 1].position, s.position) > 8192)) {
                 *p = {};
                 p->handle = s.handle;

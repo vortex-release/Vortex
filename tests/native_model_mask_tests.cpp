@@ -289,6 +289,63 @@ int main() {
             check(pixel(read(color.Get()), 48, 48) > 115,
                   "hidden capture is independent of either host predicate polarity");
         }
+        // The Present/depth-clear capture runs before SceneScope isolates the host
+        // state. A false native occlusion predicate must not suppress the copy and
+        // publish stale world depth to tracers, fire areas, or the hidden model pass.
+        native_mask::Discard();
+        for (BOOL polarity : {FALSE, TRUE}) {
+            context->SetPredication(nullptr, FALSE);
+            bind(false);
+            scene_depth::EndOverlay();
+            context->ClearDepthStencilView(dsv.Get(), D3D11_CLEAR_DEPTH, 1, 0);
+            draw({0, 0, polarity ? .35f : .65f, .4f});
+            const auto expectedDepth = read(depth.Get());
+            context->SetPredication(predicate.Get(), polarity);
+            const auto captured = scene_depth::BeginOverlay();
+            ComPtr<ID3D11Predicate> restored;
+            BOOL value{};
+            context->GetPredication(&restored, &value);
+            check(restored.Get() == predicate.Get() && value == polarity,
+                  "world depth capture restores the host predicate and polarity");
+            context->SetPredication(nullptr, FALSE);
+            ComPtr<ID3D11Resource> resource;
+            ComPtr<ID3D11Texture2D> capturedTexture;
+            if (captured.view) {
+                captured.view->GetResource(&resource);
+                require(resource.As(&capturedTexture));
+            }
+            check(capturedTexture && captured.copies == 1 && read(capturedTexture.Get()) == expectedDepth,
+                  "world depth copy is current under either host predicate polarity");
+        }
+        for (bool depthOnly : {false, true}) {
+            for (bool reversed : {false, true}) {
+                bind(reversed);
+                scene_depth::EndOverlay();
+                if (depthOnly)
+                    context->OMSetRenderTargets(0, nullptr, dsv.Get());
+                const float clearDepth = reversed ? 0.f : 1.f;
+                context->ClearDepthStencilView(dsv.Get(), D3D11_CLEAR_DEPTH, clearDepth, 0);
+                if (!depthOnly)
+                    context->ClearDepthStencilView(dsv.Get(), D3D11_CLEAR_DEPTH, clearDepth, 0);
+                draw({0, 0, reversed ? .65f : .35f, .4f});
+                const auto expectedDepth = read(depth.Get());
+                context->OMSetRenderTargets(0, nullptr, nullptr);
+                context->ClearDepthStencilView(dsv.Get(), D3D11_CLEAR_DEPTH, clearDepth, 0);
+                const auto captured = scene_depth::BeginOverlay();
+                ComPtr<ID3D11Resource> resource;
+                ComPtr<ID3D11Texture2D> capturedTexture;
+                if (captured.view) {
+                    captured.view->GetResource(&resource);
+                    require(resource.As(&capturedTexture));
+                }
+                check(capturedTexture && captured.reversed == reversed && captured.copies == 1 &&
+                          read(capturedTexture.Get()) == expectedDepth,
+                      depthOnly ? "depth-only scene prepass survives the later depth clear"
+                                : "redundant empty depth clear does not freeze later world geometry");
+            }
+        }
+        scene_depth::DiscardFrame();
+        require(native_mask::Render(device.Get(), context.Get(), target.Get(), desc, dsv.Get(), false, true, status));
         bind(false);
         D3D11_QUERY_DESC countDesc{D3D11_QUERY_OCCLUSION, 0};
         ComPtr<ID3D11Query> occlusion;

@@ -9,6 +9,7 @@
 #include "world_visuals.hpp"
 #include "assist_features.hpp"
 #include "visual_styles.hpp"
+#include "skeleton.hpp"
 #include "font_catalog.hpp"
 #include "camera_visuals.hpp"
 #include "scene_style.hpp"
@@ -52,6 +53,7 @@ struct VisualOptions {
     worldvisuals::Options worldVisuals;
     assist::Options assists;
     styling::Player playerStyle;
+    skeleton::Options skeleton;
     styling::Sky sky;
     std::uint32_t menuFont{}, hudFont{}, menuAnimations{1}, menuPage{};
     std::uint32_t sessionBadge{1}, badgeLight{1};
@@ -62,7 +64,8 @@ struct VisualOptions {
 inline bool ValidVisualOptions(const VisualOptions &v) noexcept {
     if (!cosmetics::Valid(v.cosmetics) || !weather::Valid(v.weather) || !scoreboard::Valid(v.scoreboard) ||
         !scene::Valid(v.scene) || !lineups::Valid(v.lineups) || !camera_visuals::Valid(v.cameraVisuals) ||
-        !assist::Valid(v.assists) || !styling::Valid(v.playerStyle) || !styling::Valid(v.sky))
+        !assist::Valid(v.assists) || !styling::Valid(v.playerStyle) || !styling::Valid(v.sky) ||
+        !skeleton::Valid(v.skeleton))
         return false;
     if (v.sessionBadge > 1 || v.badgeLight > 1 || !std::isfinite(v.badgeScale) || v.badgeScale < .75f ||
         v.badgeScale > 1.5f || !std::isfinite(v.badgeOpacity) || v.badgeOpacity < .25f || v.badgeOpacity > 1)

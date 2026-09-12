@@ -176,6 +176,73 @@ int main() {
         areas.Render(device.Get(), context.Get(), target.Get(), colorDesc, nullptr, false, matrix, view, *world,
                      options, 1, areaStatus);
         check(areaStatus.status == EffectsStatus::DepthUnavailable, "fire footprint reports unavailable depth");
+        fire = {};
+        fire.handle = 17;
+        fire.type = combat::AreaType::Fire;
+        fire.center = {0, 0, .2f};
+        fire.radius = .3f;
+        fire.duration = 7;
+        fire.remaining = 6;
+        fire.estimatedFootprint = true;
+        const auto renderArea = [&](float sceneDepth, bool reverse = false, bool available = true) {
+            context->OMSetRenderTargets(0, nullptr, nullptr);
+            context->ClearRenderTargetView(target.Get(), clear);
+            context->ClearDepthStencilView(dsv.Get(), D3D11_CLEAR_DEPTH, sceneDepth, 0);
+            require(areas.Render(device.Get(), context.Get(), target.Get(), colorDesc, available ? dsv.Get() : nullptr,
+                                 reverse, matrix, view, *world, options, 1, areaStatus));
+            context->OMSetRenderTargets(0, nullptr, nullptr);
+            return read(color.Get());
+        };
+        footprint = renderArea(.5f);
+        check(pixel(footprint, 48, 48) > 55 && pixel(footprint, 48, 48) < 70 && areas.State().areas == 1 &&
+                  areas.State().eventFootprints == 1 && areas.State().cells == 0 && areas.State().vertices == 60,
+              "event-only inferno produces a depth-tested ground footprint before cells arrive");
+        const auto eventBuilds = areas.GeometryRebuilds();
+        footprint = renderArea(.5f);
+        check(areas.GeometryRebuilds() == eventBuilds, "unchanged event footprint reuses geometry");
+        footprint = renderArea(.1f);
+        check(std::accumulate(footprint.begin(), footprint.end(), 0u) == 0,
+              "event-only footprint does not show through walls");
+        footprint = renderArea(.1f, true);
+        check(pixel(footprint, 48, 48) > 55, "event-only footprint supports reversed scene depth");
+        footprint = renderArea(.5f, true);
+        check(std::accumulate(footprint.begin(), footprint.end(), 0u) == 0,
+              "event-only footprint remains occluded with reversed scene depth");
+        footprint = renderArea(.5f, false, false);
+        check(areaStatus.status == EffectsStatus::DepthUnavailable &&
+                  std::accumulate(footprint.begin(), footprint.end(), 0u) == 0,
+              "event-only footprint reports missing depth without drawing through geometry");
+        fire.center = {-.5f, 0, .2f};
+        fire.radius = .2f;
+        footprint = renderArea(.5f);
+        check(areas.GeometryRebuilds() == eventBuilds + 1 && pixel(footprint, 24, 48) > 55 &&
+                  pixel(footprint, 48, 48) == 0,
+              "event footprint center and radius changes invalidate its geometry cache");
+        fire.cellCount = 1;
+        fire.cells[0] = {.5f, 0, .2f};
+        fire.cellRadius = .2f;
+        fire.estimatedFootprint = false;
+        footprint = renderArea(.5f);
+        check(pixel(footprint, 24, 48) == 0 && pixel(footprint, 72, 48) > 55 && areas.State().cells == 1 &&
+                  areas.State().eventFootprints == 0,
+              "exact burning cells replace the event estimate without retaining its old area");
+        fire.cellCount = 0;
+        footprint = renderArea(.5f);
+        check(areas.State().rejected == 1 && areas.State().vertices == 0 &&
+                  std::accumulate(footprint.begin(), footprint.end(), 0u) == 0,
+              "unmarked zero-cell records cannot generate guessed fire areas");
+        fire.estimatedFootprint = true;
+        fire.remaining = 0;
+        footprint = renderArea(.5f);
+        check(areas.State().rejected == 1 && areas.State().vertices == 0 &&
+                  std::accumulate(footprint.begin(), footprint.end(), 0u) == 0,
+              "expired event estimate is removed even when its snapshot is retained");
+        fire.remaining = 6;
+        options.fireArea = 0;
+        footprint = renderArea(.5f);
+        check(areas.State().areas == 0 && areas.State().rejected == 0 && areas.State().vertices == 0 &&
+                  std::accumulate(footprint.begin(), footprint.end(), 0u) == 0,
+              "disabling fire areas clears rendering diagnostics and suppresses event estimates");
         check(MH_Initialize() == MH_OK, "MinHook initialized for capture fixture");
         require(scene_depth::Start(device.Get(), context.Get(), 96, 96));
         scene_depth::EndOverlay();

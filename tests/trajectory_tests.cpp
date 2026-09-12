@@ -42,10 +42,13 @@ bool Sweep(void *context, Vector3 a, Vector3 b, Collision &out) noexcept {
 struct Fixture {
     std::vector<unsigned char> bytes = std::vector<unsigned char>(0x40000);
     unsigned nameReads{}, reads{};
+    std::uintptr_t unreadable{};
     template <class T> void Set(std::uintptr_t at, T value) { std::memcpy(bytes.data() + at, &value, sizeof(value)); }
     static bool Read(void *self, std::uintptr_t at, void *out, std::size_t count) noexcept {
         auto &fixture = *static_cast<Fixture *>(self);
         ++fixture.reads;
+        if (at == fixture.unreadable)
+            return false;
         if (at == 0x14000)
             ++fixture.nameReads;
         auto &v = static_cast<Fixture *>(self)->bytes;
@@ -80,6 +83,23 @@ int main() {
     p.handle = 0x10001;
     trails.Update({&p, 1}, 16.1);
     Check(trails.Paths()[0].handle != trails.Paths()[1].handle, "reused entity index keeps generations separate");
+    Trails resumed;
+    Projectile resumedProjectile{0x8004, Utility::HE, {1, 2, 3}};
+    resumed.Update({&resumedProjectile, 1}, 20);
+    resumedProjectile.position.x = 2;
+    resumed.Update({&resumedProjectile, 1}, 20.02);
+    resumed.Update({}, 20.03);
+    resumedProjectile.position.x = 3;
+    resumed.Update({&resumedProjectile, 1}, 20.04);
+    Check(resumed.Paths()[0].points.count == 3 && resumed.Paths()[0].points[0].position.x == 1,
+          "one missed sample preserves the earlier projectile path");
+    resumed.Update({}, 20.05);
+    resumed.Update({&resumedProjectile, 1}, 20.4);
+    Check(resumed.Paths()[0].points.count == 1, "a long gap does not bridge an unknown projectile trajectory");
+    resumedProjectile.type = Utility::Smoke;
+    resumed.Update({&resumedProjectile, 1}, 20.42);
+    Check(resumed.Paths()[0].points.count == 1 && resumed.Paths()[0].type == Utility::Smoke,
+          "a changed projectile type cannot inherit another trajectory");
     Tracers traces;
     for (unsigned i = 0; i < 140; ++i)
         traces.Add({{0, 0, 0}, {float(i), 0, 0}, 1, 2, i * .001});
@@ -160,6 +180,12 @@ int main() {
     Check(tracker.Update(memory, list, 1.01, frame) && frame.count == 1 && frame.values[0].position.x == 80 &&
               fixture.nameReads == names,
           "known projectile moves every frame without rescanning designer names");
+    fixture.unreadable = scene + cs2::offsets::Origin;
+    Check(tracker.Update(memory, list, 1.015, frame) && frame.count == 0,
+          "a failed position read never publishes a stale projectile");
+    fixture.unreadable = 0;
+    Check(tracker.Update(memory, list, 1.016, frame) && frame.count == 1 && frame.values[0].position.x == 80,
+          "known projectile retries immediately before the next discovery scan");
     fixture.Set(chunk + cs2::offsets::EntityStride + 0x10, std::uint32_t{0x18001});
     Check(tracker.Update(memory, list, 1.02, frame) && frame.count == 0,
           "recycled projectile handle drops immediately");
@@ -193,6 +219,40 @@ int main() {
           "bounded discovery skips empty chunks and finds client-only utility in four ticks");
     fixture.Set(list + cs2::offsets::EntityTable + 32 * sizeof(std::uintptr_t), std::uintptr_t{0});
     Check(tracker.Update(memory, list, 2.1, frame) && !frame.count, "unloaded chunks drop cached utility");
+    // Held-grenade reads reject recycled active-weapon handles and malformed state.
+    const std::uintptr_t pawn = 0x20000, heldWeapon = 0x23000, pawnScene = 0x27000, services = 0x26000;
+    const auto weaponIdentity = chunk + 2 * cs2::offsets::EntityStride;
+    fixture.Set(weaponIdentity, heldWeapon);
+    fixture.Set(weaponIdentity + 0x10, std::uint32_t{0x8002});
+    fixture.Set(heldWeapon + cs2::offsets::Identity, weaponIdentity);
+    fixture.Set(heldWeapon + cs2::offsets::AttributeManager + cs2::offsets::ItemView + cs2::offsets::ItemDefinition,
+                std::uint16_t{44});
+    fixture.Set(pawn + cs2::offsets::SceneNode, pawnScene);
+    fixture.Set(pawnScene + cs2::offsets::Origin, Vector3{10, 20, 30});
+    fixture.Set(pawn + cs2::offsets::ViewOffset, Vector3{0, 0, 64});
+    fixture.Set(pawn + cs2::offsets::WeaponServices, services);
+    fixture.Set(services + cs2::offsets::ActiveWeapon, std::uint32_t{0x8002});
+    Throw held;
+    Check(cs2::ReadThrow(memory, list, pawn, {0, 90, 0}, held) && held.type == Utility::HE && held.eye.z == 94 &&
+              held.strength == 1,
+          "equipped grenade previews before the pin is pulled");
+    Check(cs2::ReadThrow(memory, list, pawn, {0, 450, 0}, held) && held.yaw == 90,
+          "finite unwrapped yaw stays previewable after full camera rotations");
+    fixture.Set(heldWeapon + cs2::offsets::PinPulled, std::uint8_t{1});
+    fixture.Set(heldWeapon + cs2::offsets::ThrowStrength, .5f);
+    Check(cs2::ReadThrow(memory, list, pawn, {0, 90, 0}, held) && held.strength == .5f,
+          "held grenade preview uses the active throw strength");
+    fixture.Set(weaponIdentity + 0x10, std::uint32_t{0x18002});
+    Check(!cs2::ReadThrow(memory, list, pawn, {0, 90, 0}, held),
+          "recycled weapon index cannot become the active grenade");
+    fixture.Set(weaponIdentity + 0x10, std::uint32_t{0x8002});
+    fixture.Set(heldWeapon + cs2::offsets::ThrowTime, std::numeric_limits<float>::quiet_NaN());
+    Check(!cs2::ReadThrow(memory, list, pawn, {0, 90, 0}, held), "invalid throw time cannot produce a preview");
+    fixture.Set(heldWeapon + cs2::offsets::ThrowTime, 1.f);
+    Check(!cs2::ReadThrow(memory, list, pawn, {0, 90, 0}, held), "committed throws do not retain a held preview");
+    fixture.Set(heldWeapon + cs2::offsets::ThrowTime, 0.f);
+    Check(!cs2::ReadThrow(memory, list, pawn, {0, std::numeric_limits<float>::quiet_NaN(), 0}, held),
+          "invalid view angles never enter collision prediction");
     // Exercise the production ImDrawList path with offscreen clipping and faded geometry.
     ImGui::CreateContext();
     auto &io = ImGui::GetIO();

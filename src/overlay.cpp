@@ -39,6 +39,7 @@
 #include "session_badge.hpp"
 #include "assist_runtime.hpp"
 #include "player_decoration.hpp"
+#include "skeleton_draw.hpp"
 #include "scene_grade.hpp"
 #include "scene_depth_capture.hpp"
 #include "depth_resolve.hpp"
@@ -270,6 +271,18 @@ class Renderer {
         info.trajectoryDrawCalls = trajectoryStatus_.drawCalls;
         info.trajectoryResult = trajectoryStatus_.result;
         info.areaDepth = areaStatus_.status == EffectsStatus::Ready;
+        info.areaResult = areaStatus_.result;
+        const auto &areas = areas_.State();
+        info.areaCells = areas.cells;
+        info.renderedAreas = areas.areas;
+        info.areaVertices = areas.vertices;
+        info.estimatedAreas = areas.eventFootprints;
+        info.rejectedAreas = areas.rejected;
+    }
+    bool FireReplacementReady() const noexcept {
+        const auto &areas = areas_.State();
+        return areaStatus_.status == EffectsStatus::Ready && areas.areas && areas.cells && !areas.eventFootprints &&
+               !areas.rejected;
     }
     bool MenuAnimating() const noexcept { return menuMotion_.Visible(); }
     HRESULT Initialize(IDXGISwapChain *chain, const Configuration &config) {
@@ -303,7 +316,8 @@ class Renderer {
                    const EffectGeometryData *geometry, ID3D11DepthStencilView *sceneDepth, bool reversedDepth,
                    EffectsState &effectsState, const PreviewPose *previewPose, const flight::Trails &trails,
                    const cs2::FlightSnapshot &flightData, const combat::WorldSnapshot &world,
-                   const combat::ReplayFrame &ghosts, const worldvisuals::Drops &drops) {
+                   const combat::ReplayFrame &ghosts, const worldvisuals::Drops &drops,
+                   const skeleton::Frame *skeletons) {
         if (!backendReady_) {
             const HRESULT hr = CreateImGui(c);
             if (FAILED(hr))
@@ -544,6 +558,9 @@ class Renderer {
                 DrawLine(d, start, at, outline, c.lineThickness + 2);
                 DrawLine(d, start, at, color, c.lineThickness);
             }
+            if (skeletons)
+                skeleton::Draw(*d, skeletons->poses[order[i]], e.id, frame.viewProjection, v, visual.skeleton,
+                               teamColor, c.outline, alpha);
             if (c.boxes)
                 styling::Border(*d, box, c.colorBoxesByHealth ? healthColor : teamColor, c.outline, alpha,
                                 c.boxThickness, visual.cornerBoxes != 0, visual.playerStyle);
@@ -601,6 +618,7 @@ class Renderer {
         }
         if (c.enabled && hasFreshFrame)
             sceneGrade_.Render(device_.Get(), context_.Get(), backBuffer.Get(), target.Get(), visual.combat);
+        areaStatus_ = {};
         if (c.enabled && hasFreshFrame && info.cs2)
             areas_.Render(device_.Get(), context_.Get(), target.Get(), desc, sceneDepth, reversedDepth,
                           frame.viewProjection, v, world, visual.combat, c.opacity, areaStatus_);
@@ -1100,6 +1118,10 @@ struct Runtime {
                                            GetForegroundWindow() == window);
             cs2::RefreshTrajectoryInputs();
             cs2::CopyTrajectories(flightData, &diagnosticLog);
+            info.predictionStatus = cs2::PredictionStateName(flightData.predictionState);
+            info.predictionAttempts = flightData.predictionAttempts;
+            info.predictionFailures = flightData.predictionFailures;
+            info.predictionPoints = static_cast<unsigned>(flightData.prediction.count);
             cs2::ConfigureViewmodel(visual.cameraVisuals, fresh && c.enabled);
             const auto &capture = flightData.lineup;
             if (fresh && capture.valid && FrameSeconds() - capture.time <= .25) {
@@ -1165,6 +1187,7 @@ struct Runtime {
                                                                       FrameSeconds(), visual.worldVisuals.footDuration);
         info.footstepEvents = flightData.footstepEvents + source.FootstepCount();
         info.droppedWeapons = useCs2 ? source.Dropped().count : 0;
+        info.skeletonPlayers = useCs2 ? source.Skeletons().count : 0;
         auto &world = worldScratch;
         world.Clear();
         if (useCs2 && fresh && c.enabled) {
@@ -1197,6 +1220,7 @@ struct Runtime {
             ghosts.Clear();
             flightData.feedback.Clear();
         }
+        renderer->Diagnostics(info);
         info.utilityEntities = world.discovered;
         info.fireEntities = world.fireEntities;
         info.burningCells = world.burningCells;
@@ -1205,12 +1229,14 @@ struct Runtime {
         static double nextWorldLog{};
         if (useCs2 && visual.combat.areas && FrameSeconds() >= nextWorldLog) {
             nextWorldLog = FrameSeconds() + 5;
-            char message[256]{};
+            char message[384]{};
             std::snprintf(message, sizeof(message),
                           "World: fresh=%d utility=%u infernos=%u burning=%u readFailures=%u areas=%u enabled=%u "
-                          "fire=%u events=%llu.",
+                          "fire=%u events=%llu gpuAreas=%u vertices=%u estimated=%u rejected=%u depth=%d result=%08X.",
                           fresh, world.discovered, world.fireEntities, world.burningCells, world.fireReadFailures,
-                          info.areaCount, visual.combat.areas, visual.combat.fireArea, flightData.infernoEvents);
+                          info.areaCount, visual.combat.areas, visual.combat.fireArea, flightData.infernoEvents,
+                          info.renderedAreas, info.areaVertices, info.estimatedAreas, info.rejectedAreas,
+                          info.areaDepth, static_cast<unsigned>(info.areaResult));
             diagnosticLog.Push(message);
         }
         info.skyCount = source.SkyCount();
@@ -1231,8 +1257,7 @@ struct Runtime {
             profileLibraryRequested = true;
             profileView.busy = info.profileIoBusy = profileBrowser.Busy();
         }
-        renderer->Diagnostics(info);
-        info.areaCells = world.burningCells;
+
         info.renderMs = renderMs;
         info.readMs = useCs2 ? source.ReadMilliseconds() : readMs;
         info.totalMs = totalMs;
@@ -1288,10 +1313,10 @@ struct Runtime {
         if (useCs2 && fresh && bridge.Visible() && renderer->WantsPreview())
             source.ReadPreview(f, previewPose);
         const auto renderStart = std::chrono::steady_clock::now();
-        const HRESULT hr =
-            renderer->Render(chain.Get(), f, c, visual, drawn, bridge, info, fresh, edited, actions, t, effectConfig,
-                             geometry.get(), sceneDepth.Get(), reversedDepth, nextEffects, &previewPose, trails,
-                             flightData, world, ghosts, useCs2 ? source.Dropped() : worldvisuals::Drops{});
+        const HRESULT hr = renderer->Render(
+            chain.Get(), f, c, visual, drawn, bridge, info, fresh, edited, actions, t, effectConfig, geometry.get(),
+            sceneDepth.Get(), reversedDepth, nextEffects, &previewPose, trails, flightData, world, ghosts,
+            useCs2 ? source.Dropped() : worldvisuals::Drops{}, useCs2 ? &source.Skeletons() : nullptr);
         renderMs = std::chrono::duration<float, std::milli>(std::chrono::steady_clock::now() - renderStart).count();
         if (actions.rescan)
             source.Rescan();
@@ -1320,7 +1345,11 @@ struct Runtime {
         hitSerial = flightData.feedback.serial;
         if (fresh && c.enabled && !actions.rescan)
             hitSounds.Trigger(hits);
-        cs2::ConfigureWorldEffects(visual.combat, world, visual.scene,
+        auto worldEffects = visual.combat;
+        // Retain the original fire until its exact replacement was actually drawn.
+        if (!renderer->FireReplacementReady())
+            worldEffects.fireArea = 0;
+        cs2::ConfigureWorldEffects(worldEffects, world, visual.scene,
                                    useCs2 && fresh && c.enabled && SUCCEEDED(hr) && !actions.rescan);
         if (useCs2) {
             const bool nativeFresh = fresh && c.enabled && SUCCEEDED(hr) && !actions.rescan;

@@ -12,7 +12,7 @@ class CachedSource {
         TargetBone bone{TargetBone::Head};
         bool badge{};
         bool preview{}, projectiles{}, world{}, ghosts{}, kills{}, models{}, spectators{}, dropped{}, velocities{},
-            footsteps{};
+            footsteps{}, skeletons{};
         float gameTime{}, ghostDuration{.18f};
         Configuration config;
         styling::Sky sky;
@@ -26,6 +26,7 @@ class CachedSource {
         combat::WorldSnapshot world;
         combat::ReplayFrame ghosts;
         PreviewPose preview;
+        skeleton::Frame skeletons;
         SpectatorFrame spectators;
         tracking::Sample tracking;
         worldvisuals::Drops dropped;
@@ -92,6 +93,7 @@ class CachedSource {
                 }
                 out.ping = -1;
                 out.preview = {};
+                out.skeletons = {};
                 out.tracking = {};
                 out.dropped = {};
                 out.footsteps.Clear();
@@ -137,6 +139,8 @@ class CachedSource {
                         spectators_ = {};
                         nextSpectators_ = 0;
                     }
+                    if (request.skeletons)
+                        source_.ReadSkeletons(out.frame, request.config, out.skeletons);
                     if (request.preview)
                         source_.ReadPreview(out.frame, out.preview);
                     if (request.projectiles)
@@ -188,6 +192,7 @@ class CachedSource {
         request_.badge = c.enabled && v.sessionBadge;
         request_.config = c;
         request_.preview = preview;
+        request_.skeletons = c.enabled && v.skeleton.enabled;
         request_.projectiles = c.enabled && v.grenadeTrails;
         request_.world = c.enabled && (v.combat.bombTimer || v.combat.areas || v.combat.utilityTimers);
         request_.ghosts = c.enabled && v.combat.ghosts;
@@ -255,6 +260,7 @@ class CachedSource {
     float ReadMilliseconds() const { return current_.readMs; }
     const SpectatorFrame &Spectators() const { return current_.spectators; }
     const model::Targets &ModelTargets() const { return current_.targets; }
+    const skeleton::Frame &Skeletons() const { return current_.skeletons; }
     bool ReadPreview(const FrameSnapshot &, PreviewPose &out) const {
         out = current_.preview;
         return out.valid;

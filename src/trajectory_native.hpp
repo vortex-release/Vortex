@@ -11,6 +11,37 @@ struct LineupSample {
     double time{};
     bool valid{};
 };
+enum class PredictionState : std::uint8_t {
+    Disabled,
+    AwaitingView,
+    NoViewHook,
+    NoHeldGrenade,
+    TraceUnavailable,
+    CollisionFailed,
+    Ready,
+    Stale
+};
+inline const char *PredictionStateName(PredictionState state) noexcept {
+    switch (state) {
+    case PredictionState::Disabled:
+        return "disabled";
+    case PredictionState::AwaitingView:
+        return "awaiting-view";
+    case PredictionState::NoViewHook:
+        return "view-hook-unavailable";
+    case PredictionState::NoHeldGrenade:
+        return "no-valid-held-grenade";
+    case PredictionState::TraceUnavailable:
+        return "collision-trace-unavailable";
+    case PredictionState::CollisionFailed:
+        return "collision-prediction-failed";
+    case PredictionState::Ready:
+        return "ready";
+    case PredictionState::Stale:
+        return "stale-view-sample";
+    }
+    return "unknown";
+}
 struct FlightSnapshot {
     LineupSample lineup;
     flight::Prediction prediction;
@@ -27,6 +58,8 @@ struct FlightSnapshot {
     double predictedAt{};
     std::uint64_t resetSerial{};
     bool hooked{}, collisionReady{};
+    PredictionState predictionState{};
+    std::uint64_t predictionAttempts{}, predictionFailures{};
     std::uint64_t tracerCallbacks{}, acceptedTracers{}, setupSamples{}, recoilWrites{};
     bool viewConnected{}, eventsConnected{}, tracerConnected{}, punchConnected{}, bulletConnected{},
         particleConnected{};

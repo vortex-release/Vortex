@@ -390,16 +390,18 @@ void AfterSetup(std::uintptr_t view) {
     // Keep the input sample taken before setup, without evaluating it a second time.
 
     flight::Prediction prediction;
-    bool collisionReady = false;
-    if (state.sweepLayout && settings.grenadePrediction && m.Field(state.client, offsets::EntityList, list) &&
-        m.Field(state.client, offsets::LocalPawn, pawn)) {
-        Vector3 throwAngles{};
-        flight::Throw input;
+    bool collisionReady = false, attempted = false;
+    auto predictionState = settings.grenadePrediction ? PredictionState::NoHeldGrenade : PredictionState::Disabled;
+    Vector3 throwAngles{};
+    flight::Throw input;
+    if (settings.grenadePrediction && m.Field(state.client, offsets::EntityList, list) &&
+        m.Field(state.client, offsets::LocalPawn, pawn) && m.Field(state.client, offsets::ViewAngles, throwAngles) &&
+        ReadThrow(m, list, pawn, throwAngles, input)) {
+        predictionState = PredictionState::TraceUnavailable;
         TraceContext ctx;
         std::uintptr_t physics{};
-        if (m.Field(state.client, abi::TraceManagerSlot, ctx.manager) && m.Read(ctx.manager, physics) && physics &&
-            m.Field(state.client, offsets::ViewAngles, throwAngles) && ReadThrow(m, list, pawn, throwAngles, input) &&
-            InitializeFilter(ctx, pawn)) {
+        if (state.sweepLayout && m.Field(state.client, abi::TraceManagerSlot, ctx.manager) &&
+            m.Read(ctx.manager, physics) && physics && InitializeFilter(ctx, pawn)) {
             const auto &old = state.previousThrow;
             const bool unchanged =
                 state.havePrediction && input.type == old.type && Distance(input.eye, old.eye) < .01f &&
@@ -414,14 +416,19 @@ void AfterSetup(std::uintptr_t view) {
             state.previousThrow = input;
             state.havePrediction = true;
 
+            attempted = true;
             prediction = flight::Predict(input, {&ctx, Sweep});
             collisionReady = prediction.valid;
+            predictionState = prediction.valid ? PredictionState::Ready : PredictionState::CollisionFailed;
         }
     }
     std::scoped_lock lock(state.mutex);
     state.output.prediction = prediction;
     state.output.predictedAt = now;
     state.output.collisionReady = collisionReady;
+    state.output.predictionState = predictionState;
+    state.output.predictionAttempts += attempted;
+    state.output.predictionFailures += attempted && !prediction.valid;
     if (!prediction.valid) {
         state.havePrediction = false;
         state.predictionCadence.Reset();
@@ -838,8 +845,15 @@ void ConfigureTrajectories(const VisualOptions &settings, bool fresh, bool recoi
         }
         if (!fresh || !settings.worldVisuals.footsteps)
             state.output.footsteps.Clear();
-        if (!fresh || !settings.grenadePrediction)
+        if (!fresh || !settings.grenadePrediction) {
             state.output.prediction = {};
+            state.output.collisionReady = false;
+            state.output.predictionState = PredictionState::Disabled;
+        } else if (!state.viewHook) {
+            state.output.predictionState = PredictionState::NoViewHook;
+        } else if (state.output.predictionState == PredictionState::Disabled) {
+            state.output.predictionState = PredictionState::AwaitingView;
+        }
         if (!fresh) {
             state.output.feedback.Clear();
             state.output.blasts.Clear();
@@ -883,7 +897,8 @@ void CopyTrajectories(FlightSnapshot &out, DeferredLog *logger) noexcept {
         std::scoped_lock lock(state.mutex);
         state.output.tracers.Expire(now);
         out = state.output;
-        log = now >= state.nextLog && (state.settings.bulletTracers || state.settings.combat.recoil);
+        log = now >= state.nextLog &&
+              (state.settings.bulletTracers || state.settings.grenadePrediction || state.settings.combat.recoil);
         if (log) {
             state.nextLog = now + 5;
             recoilInput = state.settings.combat.recoilInput;
@@ -891,6 +906,12 @@ void CopyTrajectories(FlightSnapshot &out, DeferredLog *logger) noexcept {
             recoilActive = state.recoilActive;
             fresh = GetTickCount64() <= state.deadline;
         }
+    }
+    if (now - out.predictedAt > .25) {
+        out.prediction = {};
+        out.collisionReady = false;
+        if (out.predictionState == PredictionState::Ready)
+            out.predictionState = PredictionState::Stale;
     }
     // File logging can block. Release the shared event/view snapshot lock before
     // formatting or writing diagnostics so engine callbacks can keep publishing.
@@ -911,13 +932,16 @@ void CopyTrajectories(FlightSnapshot &out, DeferredLog *logger) noexcept {
         std::snprintf(message, sizeof(message), "Bullet sources: direct=%llu particle=%llu.", out.bulletCallbacks,
                       out.particleCallbacks);
         logger->Push(message);
+        std::snprintf(message, sizeof(message),
+                      "Grenade preview: state=%s attempts=%llu failures=%llu points=%u age=%.3f view=%d.",
+                      PredictionStateName(out.predictionState), out.predictionAttempts, out.predictionFailures,
+                      out.prediction.count, out.predictedAt > 0 ? now - out.predictedAt : -1., out.viewConnected);
+        logger->Push(message);
     }
     if (now - out.sampledAt > .25) {
         out.recoil = {};
         out.sampledAt = 0;
     }
-    if (now - out.predictedAt > .25)
-        out.prediction = {};
 }
 HRESULT StopTrajectories() noexcept {
     state.available = false;

@@ -223,6 +223,7 @@ struct Area {
     std::uint32_t cellCount{};
     float cellRadius{25.f};
     AreaTimer timer;
+    bool estimatedFootprint{}; // Event-only ground estimate until exact burning cells arrive.
 };
 struct WorldSnapshot {
     Bomb bomb;
@@ -292,6 +293,7 @@ inline void AppendInfernoEvents(const InfernoEvents &events, double now, WorldSn
         area.height = 6;
         area.remaining = static_cast<float>(7 - age);
         area.duration = 7;
+        area.estimatedFootprint = true;
         world.areas[world.areaCount++] = area;
     }
 }

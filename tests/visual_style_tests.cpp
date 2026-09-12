@@ -1,5 +1,6 @@
 #include "sky_tint.hpp"
 #include "player_decoration.hpp"
+#include "skeleton_draw.hpp"
 #include "presets.hpp"
 #include <vector>
 #include <cstdio>
@@ -196,6 +197,37 @@ int main() {
     for (const auto &v : draw.VtxBuffer)
         finite &= std::isfinite(v.pos.x) && std::isfinite(v.pos.y) && v.pos.x > 80 && v.pos.x < 220;
     check(finite, "decorations remain finite and close to their box");
+    {
+        skeleton::Options options;
+        options.enabled = 1;
+        skeleton::Pose pose;
+        pose.entity = 7;
+        pose.validMask = (1u << 6) | (1u << 7);
+        pose.positions[6] = {-.2f, 0, .5f};
+        pose.positions[7] = {.2f, .2f, .5f};
+        const auto matrix = Matrix4x4::Identity();
+        const Viewport viewport{0, 0, 800, 600};
+        const auto start = draw.VtxBuffer.Size;
+        check(skeleton::Draw(draw, pose, 7, matrix, viewport, options, {1, 1, 1, 1}, {0, 0, 0, 1}, 1) == 1 &&
+                  draw.VtxBuffer.Size > start,
+              "skeleton submits an actual projected joint link");
+        check(skeleton::Draw(draw, pose, 8, matrix, viewport, options, {1, 1, 1, 1}, {0, 0, 0, 1}, 1) == 0,
+              "mismatched publication identity cannot draw a skeleton on a different player");
+        pose.positions[6] = {-4, 0, -.2f};
+        pose.positions[7] = {4, .2f, .5f};
+        const auto clippedStart = draw.VtxBuffer.Size;
+        check(skeleton::Draw(draw, pose, 7, matrix, viewport, options, {1, 1, 1, 1}, {0, 0, 0, 1}, 1) == 1,
+              "crossing near-plane skeleton edges are clipped instead of disappearing");
+        bool bounded = true;
+        for (int i = clippedStart; i < draw.VtxBuffer.Size; ++i) {
+            const auto p = draw.VtxBuffer[i].pos;
+            bounded &= std::isfinite(p.x) && std::isfinite(p.y) && p.x >= -5 && p.x <= 805 && p.y >= -5 && p.y <= 605;
+        }
+        check(bounded, "skeletal vertices remain bounded when limbs leave the viewport");
+        pose.positions[7] = {4000, 0, .5f};
+        check(skeleton::Draw(draw, pose, 7, matrix, viewport, options, {1, 1, 1, 1}, {0, 0, 0, 1}, 1) == 0,
+              "implausible limb lengths cannot produce giant X artifacts");
+    }
     ImGui::EndFrame();
     ImGui::DestroyContext();
     std::printf("Visual style checks: %u checks, %u failures.\n", checks, failures);

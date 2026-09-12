@@ -123,12 +123,23 @@ Candidate *Find(ID3D11DepthStencilView *depth, bool create) {
 }
 // Never retain color views: a swap-chain RTV reference would block ResizeBuffers.
 bool EligibleTarget(UINT count, ID3D11RenderTargetView *const *targets) {
-    if (!count || !targets || !targets[0])
+    // A depth-only prepass is still scene geometry. Its matching DSV, full
+    // viewport, comparison, clear and submitted draws are validated separately.
+    // Requiring RTV[0] lost the only complete depth when forward shading skipped
+    // depth writes or the engine cleared this buffer before binding scene color.
+    if (!count)
+        return true;
+    if (!targets || count > D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT)
         return false;
+    ID3D11RenderTargetView *colorTarget{};
+    for (UINT i = 0; i < count && !colorTarget; ++i)
+        colorTarget = targets[i];
+    if (!colorTarget)
+        return true;
 
     ComPtr<ID3D11Resource> resource;
     ComPtr<ID3D11Texture2D> texture;
-    targets[0]->GetResource(&resource);
+    colorTarget->GetResource(&resource);
     if (FAILED(resource.As(&texture)))
         return false;
     D3D11_TEXTURE2D_DESC d{};
@@ -176,7 +187,17 @@ void CopySelected() {
         state.samples = d.SampleDesc.Count;
         state.quality = d.SampleDesc.Quality;
     }
+    // This copy can run in the game's ClearDepth call, before our isolated
+    // overlay context state exists. CopyResource obeys GPU predication just like
+    // Draw; preserve the host predicate but never let it suppress the snapshot.
+    ComPtr<ID3D11Predicate> predicate;
+    BOOL predicateValue{};
+    state.context->GetPredication(&predicate, &predicateValue);
+    if (predicate)
+        state.context->SetPredication(nullptr, FALSE);
     state.context->CopyResource(state.copy.Get(), source.texture.Get());
+    if (predicate)
+        state.context->SetPredication(predicate.Get(), predicateValue);
     state.fresh = true;
     ++state.copies;
 }
@@ -325,14 +346,20 @@ void STDMETHODCALLTYPE ClearHook(ID3D11DeviceContext *c, ID3D11DepthStencilView 
                         state.observing.store(false, std::memory_order_release);
                     }
                 }
-                candidate->frozen = true;
+                // No submitted geometry means there is nothing to preserve.
+                // Two initial clears are harmless; freezing here rejected the
+                // entire ensuing world pass. If an allocation failed, do not
+                // later publish the now-cleared buffer as an old valid scene.
+                if (!state.fresh && state.selected == candidate)
+                    state.selected = nullptr;
             }
-            if (value == 0 || value == 1) {
+            candidate->drawn = false;
+            candidate->drawStart = state.drawSerial.load(std::memory_order_relaxed);
+            candidate->frozen = value != 0 && value != 1;
+            if (!candidate->frozen) {
                 candidate->clear = value;
                 ++candidate->clears;
-                candidate->drawStart = state.drawSerial.load(std::memory_order_relaxed);
-            } else
-                candidate->frozen = true;
+            }
             Eligibility();
         }
     state.clear(c, d, f, value, stencil);

@@ -1,0 +1,39 @@
+{
+  "version": "3.27.2",
+  "phase": "Local integrated preflight before release packaging",
+  "verifiedAtUtc": "2026-09-12T04:25:13.2079782Z",
+  "build": "Release x64",
+  "offlineTests": {
+    "failed": 0,
+    "passed": 54,
+    "total": 54
+  },
+  "nativeDepthRegressionChecks": 50,
+  "nativeDepthFailingChecksBeforeFix": 5,
+  "liveGameplayVerified": false,
+  "gameLaunched": false,
+  "gameInspected": false,
+  "activeSettingsPreserved": true,
+  "activeSettingsSha256": "A67CE5B3F513338E35F1BC5B9F1C46C178C4EACF8377DC76AFAB66333442C50C",
+  "dllSha256": "D0E835DA1D85BA0F6FDFD2FECA3D597E7C130BAFA880B5F97CD8CB57BC82D22B",
+  "nativeBuild": 14181,
+  "integrationNotes": [
+    "docs/visuals-3.27.2.md",
+    "docs/render-depth-recovery-3.27.2.md"
+  ],
+  "regressions": [
+    "Predication-safe scene depth copy",
+    "Redundant depth clears and depth-only world prepasses",
+    "Projectile sampling gaps and normalized held-grenade yaw",
+    "Estimated fire footprint rendering, depth, cache replacement and expiry",
+    "Skeleton bone-buffer consistency, clipping, invalid joints and configuration round trips"
+  ],
+  "releaseWorkflow": ".github/workflows/release.yml",
+  "packagingVerification": "release.ps1 repeats build/tests, validates installer/feed/checksums, and only then publishes a tag",
+  "limitations": [
+    "Offline validation only; no live visual or performance result claimed",
+    "Hidden rendering requires valid matching scene depth and cannot recover engine-culled geometry",
+    "Fire-event footprints estimate coverage until exact burning cells are available",
+    "Skeleton supports the verified common player rig and starts disabled"
+  ]
+}

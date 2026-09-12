@@ -9,6 +9,8 @@
 #include "spectator_reader.hpp"
 #include "latency_reader.hpp"
 #include "world_visuals_reader.hpp"
+#include "skeleton_reader.hpp"
+#include "entity_filter.hpp"
 #include <awareness/AddressDiscovery.hpp>
 #include <Windows.h>
 #include <memory>
@@ -63,6 +65,32 @@ class Source {
     }
     bool Update(FrameSnapshot &, TargetBone selected = TargetBone::Head) noexcept;
     bool ReadPreview(const FrameSnapshot &, PreviewPose &) const noexcept;
+    void ReadSkeletons(const FrameSnapshot &frame, const Configuration &config, skeleton::Frame &out) const noexcept {
+        out = {};
+        if (!status_.ready || !status_.buildVerified)
+            return;
+        Memory m{&sampleMemory_, LocalMemory::Read};
+        std::uintptr_t list{};
+        if (!m.Read(globals_.entitySlot, list))
+            return;
+        for (unsigned i = 0; i < frame.entityCount && i < MaxEntities; ++i) {
+            const auto &entity = frame.entities[i];
+            if (EntityOpacity(frame, entity, config) <= 0)
+                continue;
+            const auto pawn = EntityAt(m, list, entity.id);
+            std::uintptr_t scene{}, afterScene{};
+            std::uint32_t handle{}, after{};
+            auto &pose = out.poses[i];
+            if (FullHandle(m, pawn, handle) && (handle & offsets::EntryMask) == entity.id &&
+                m.Field(pawn, offsets::SceneNode, scene) && ReadSkeletonPose(m, scene, entity, pose) &&
+                FullHandle(m, pawn, after) && after == handle && m.Field(pawn, offsets::SceneNode, afterScene) &&
+                afterScene == scene) {
+                pose.handle = handle;
+                ++out.count;
+            } else
+                pose = {};
+        }
+    }
     bool ReadFlight(ProjectileFrame &out) noexcept {
         out = {};
         if (!status_.ready || !status_.buildVerified || status_.gameBuild != offsets::ExpectedBuild)

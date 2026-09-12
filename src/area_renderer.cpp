@@ -12,23 +12,27 @@ Vector3 Normal(Vector3 v) noexcept {
 void AreaRenderer::Build(Cached &cached, const Area &area) {
     cached.handle = area.handle;
     cached.count = area.cellCount;
-    cached.radius = area.cellRadius;
+    cached.eventFootprint = area.estimatedFootprint && !area.cellCount;
+    cached.radius = cached.eventFootprint ? area.radius : area.cellRadius;
+    cached.center = area.center;
     cached.cells = area.cells;
     cached.normals = area.cellNormals;
     cached.vertices.clear();
     constexpr unsigned segments = 20;
-    cached.vertices.reserve(area.cellCount * segments * 3);
-    for (unsigned i = 0; i < area.cellCount; ++i) {
-        if (!Finite(area.cells[i]))
+    const unsigned count = cached.eventFootprint ? 1 : area.cellCount;
+    cached.vertices.reserve(count * segments * 3);
+    for (unsigned i = 0; i < count; ++i) {
+        const auto position = cached.eventFootprint ? area.center : area.cells[i];
+        if (!Finite(position))
             continue;
-        const auto n = Normal(area.cellNormals[i]);
+        const auto n = Normal(cached.eventFootprint ? Vector3{0, 0, 1} : area.cellNormals[i]);
         const auto tangent = Normal(Cross(n, std::abs(n.y) > .9f ? Vector3{1, 0, 0} : Vector3{0, 1, 0}));
         const auto bitangent = Cross(n, tangent);
-        const auto center = area.cells[i] + flight::Scale(n, std::min(1.2f, area.cellRadius * .048f));
+        const auto center = position + flight::Scale(n, std::min(1.2f, cached.radius * .048f));
         auto ring = [&](unsigned j) {
             const float a = j * 6.28318530718f / segments;
-            return center + flight::Scale(tangent, std::cos(a) * area.cellRadius) +
-                   flight::Scale(bitangent, std::sin(a) * area.cellRadius);
+            return center + flight::Scale(tangent, std::cos(a) * cached.radius) +
+                   flight::Scale(bitangent, std::sin(a) * cached.radius);
         };
         for (unsigned j = 0; j < segments; ++j) {
             cached.vertices.push_back({center, 1});
@@ -43,6 +47,7 @@ HRESULT AreaRenderer::Render(ID3D11Device *device, ID3D11DeviceContext *context,
                              const Matrix4x4 &matrix, Viewport view, const WorldSnapshot &world, const Options &options,
                              float opacity, EffectsState &state) {
     state = {};
+    stats_ = {};
     combined_.clear();
     if (!options.areas || !options.fireArea || (!options.areaFill && options.areaOutline <= 0))
         return S_FALSE;
@@ -52,10 +57,18 @@ HRESULT AreaRenderer::Render(ID3D11Device *device, ID3D11DeviceContext *context,
         entry.used = false;
     for (std::size_t i = 0; i < world.areaCount; ++i) {
         const auto &area = world.areas[i];
-        if (area.type != AreaType::Fire || !area.handle || !area.cellCount || area.cellCount > area.cells.size() ||
-            !std::isfinite(area.cellRadius) || area.cellRadius <= 0 || area.cellRadius > 64 ||
-            !std::isfinite(area.remaining) || (area.duration > 0 && area.remaining <= 0))
+        if (area.type != AreaType::Fire)
             continue;
+        const bool eventFootprint = area.estimatedFootprint && !area.cellCount;
+        const float radius = eventFootprint ? area.radius : area.cellRadius;
+        if (!area.handle || (!area.cellCount && !eventFootprint) || area.cellCount > area.cells.size() ||
+            !std::isfinite(radius) || radius <= 0 || radius > (eventFootprint ? 500.f : 64.f) ||
+            !std::isfinite(area.remaining) || !std::isfinite(area.duration) ||
+            (area.duration > 0 && area.remaining <= 0) ||
+            (eventFootprint && (!Finite(area.center) || area.duration <= 0))) {
+            ++stats_.rejected;
+            continue;
+        }
         Cached *cached{};
         for (auto &entry : cache_)
             if (entry.handle == area.handle) {
@@ -70,15 +83,24 @@ HRESULT AreaRenderer::Render(ID3D11Device *device, ID3D11DeviceContext *context,
                     cached = &entry;
                     break;
                 }
-        if (!cached)
+        if (!cached) {
+            ++stats_.rejected;
             continue;
-        if (cached->handle != area.handle || cached->count != area.cellCount || cached->radius != area.cellRadius ||
+        }
+        if (cached->handle != area.handle || cached->count != area.cellCount || cached->radius != radius ||
+            cached->eventFootprint != eventFootprint ||
+            (eventFootprint && std::memcmp(&cached->center, &area.center, sizeof(Vector3))) ||
             std::memcmp(cached->cells.data(), area.cells.data(), area.cellCount * sizeof(Vector3)) ||
             std::memcmp(cached->normals.data(), area.cellNormals.data(), area.cellCount * sizeof(Vector3)))
             Build(*cached, area);
         cached->used = true;
-        if (combined_.size() + cached->vertices.size() > MaxEffectVertices)
+        if (combined_.size() + cached->vertices.size() > MaxEffectVertices) {
+            ++stats_.rejected;
             break;
+        }
+        ++stats_.areas;
+        stats_.cells += area.cellCount;
+        stats_.eventFootprints += eventFootprint ? 1 : 0;
         const float fade = area.duration > 0 ? std::clamp(area.remaining / .6f, 0.f, 1.f) : 1.f;
         const auto first = combined_.size();
         combined_.insert(combined_.end(), cached->vertices.begin(), cached->vertices.end());
@@ -88,6 +110,7 @@ HRESULT AreaRenderer::Render(ID3D11Device *device, ID3D11DeviceContext *context,
     for (auto &entry : cache_)
         if (!entry.used)
             entry.handle = 0;
+    stats_.vertices = static_cast<unsigned>(combined_.size());
     EffectsConfiguration config;
     config.materialEnabled = options.areaFill;
     config.glowEnabled = options.areaOutline > 0;
